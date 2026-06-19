@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>英語クイズ｜小学校英語</title>
+<style>
+  :root{
+    --clay:#D97757; --clay-d:#BF5B3B; --ink:#2D2A26; --mute:#6E6760;
+    --cream:#F6F2EC; --bg:#FBF8F3; --ok:#3E8E5A; --ng:#C44B3E; --line:#E7DED5;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{
+    font-family:"Hiragino Sans","Hiragino Kaku Gothic ProN","Yu Gothic",Meiryo,sans-serif;
+    background:radial-gradient(1200px 600px at 80% -10%, #F0E4D8 0%, var(--bg) 55%);
+    color:var(--ink); min-height:100vh; display:flex; align-items:center; justify-content:center; padding:24px;
+  }
+  .card{
+    width:100%; max-width:620px; background:#fff; border-radius:22px;
+    box-shadow:0 18px 50px rgba(40,33,29,.12); padding:34px 36px 30px; position:relative; overflow:hidden;
+  }
+  .badge{display:inline-flex;align-items:center;gap:8px;font-size:13px;font-weight:700;
+    color:var(--clay-d);letter-spacing:.08em;text-transform:uppercase;}
+  .badge .dot{width:9px;height:9px;border-radius:50%;background:var(--clay);}
+  h1{font-size:23px;margin:10px 0 18px;letter-spacing:.01em;}
+  .progress-wrap{display:flex;align-items:center;gap:12px;margin-bottom:22px;}
+  .progress{flex:1;height:9px;background:var(--cream);border-radius:99px;overflow:hidden;}
+  .progress>span{display:block;height:100%;width:20%;background:var(--clay);border-radius:99px;transition:width .35s ease;}
+  .count{font-size:13px;color:var(--mute);font-weight:700;white-space:nowrap;}
+  .q{font-size:20px;font-weight:700;line-height:1.5;margin-bottom:20px;}
+  .opts{display:flex;flex-direction:column;gap:12px;}
+  .opt{
+    text-align:left;border:2px solid var(--line);background:#fff;border-radius:14px;
+    padding:15px 18px;font-size:16px;color:var(--ink);cursor:pointer;transition:all .15s ease;
+    display:flex;align-items:center;gap:13px;font-family:inherit;
+  }
+  .opt .key{width:26px;height:26px;border-radius:50%;background:var(--cream);color:var(--clay-d);
+    font-weight:800;font-size:14px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+  .opt:hover{border-color:var(--clay);background:#FFF8F4;}
+  .opt.correct{border-color:var(--ok);background:#EAF5EE;}
+  .opt.correct .key{background:var(--ok);color:#fff;}
+  .opt.wrong{border-color:var(--ng);background:#FBEDEB;}
+  .opt.wrong .key{background:var(--ng);color:#fff;}
+  .opt.disabled{cursor:default;pointer-events:none;opacity:.85;}
+  .explain{margin-top:18px;padding:15px 17px;border-radius:14px;background:var(--cream);
+    font-size:14.5px;line-height:1.6;color:var(--ink);display:none;}
+  .explain.show{display:block;}
+  .explain b{color:var(--clay-d);}
+  .footer{margin-top:22px;display:flex;justify-content:flex-end;}
+  .btn{background:var(--clay);color:#fff;border:none;border-radius:12px;padding:12px 26px;
+    font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;transition:background .15s;}
+  .btn:hover{background:var(--clay-d);}
+  .btn.hidden{display:none;}
+  /* result */
+  .result{text-align:center;display:none;}
+  .result.show{display:block;}
+  .score-num{font-size:64px;font-weight:800;color:var(--clay);line-height:1;}
+  .score-num small{font-size:24px;color:var(--mute);font-weight:700;}
+  .result p{color:var(--mute);margin:14px 0 24px;font-size:16px;line-height:1.6;}
+  .made{position:absolute;top:18px;right:22px;font-size:11px;color:#B7AC9F;font-weight:600;}
+</style>
+</head>
+<body>
+  <div class="card">
+    <div class="made">AI（Claude）作成のサンプル教材</div>
+    <div id="quiz">
+      <div class="badge"><span class="dot"></span> 英語クイズ</div>
+      <h1>小学校 英語</h1>
+      <div class="progress-wrap">
+        <div class="progress"><span id="bar"></span></div>
+        <div class="count" id="count">1 / 5</div>
+      </div>
+      <div class="q" id="question"></div>
+      <div class="opts" id="opts"></div>
+      <div class="explain" id="explain"></div>
+      <div class="footer">
+        <button class="btn hidden" id="next">次の問題 →</button>
+      </div>
+    </div>
+    <div class="result" id="result">
+      <div class="badge" style="justify-content:center;"><span class="dot"></span> 結果</div>
+      <h1 style="margin-bottom:24px;">おつかれさまでした！</h1>
+      <div class="score-num"><span id="final">0</span><small> / 5</small></div>
+      <p id="msg"></p>
+      <button class="btn" id="retry" style="margin:0 auto;">もう一度挑戦する</button>
+    </div>
+  </div>
+
+<script>
+const QUIZ=[
+  {q:"「りんご」を英語で言うと？",
+   opts:["orange","apple","banana","grape"],
+   answer:1, exp:"りんごは <b>apple</b>（アップル）です。"},
+  {q:"「ありがとう」を英語で言うと？",
+   opts:["Hello","Goodbye","Thank you","Sorry"],
+   answer:2, exp:"お礼を言うときは <b>Thank you</b>（サンキュー）と言います。"},
+  {q:"青色は英語で何という？",
+   opts:["red","green","yellow","blue"],
+   answer:3, exp:"青は <b>blue</b>（ブルー）です。"},
+  {q:"数字の「3」は英語で？",
+   opts:["two","three","four","five"],
+   answer:1, exp:"3 は <b>three</b>（スリー）です。"},
+  {q:"「犬」は英語で何という？",
+   opts:["cat","bird","dog","fish"],
+   answer:2, exp:"犬は <b>dog</b>（ドッグ）です。"},
+];
+let idx=0, score=0, locked=false;
+const keys=["A","B","C","D"];
+const $=id=>document.getElementById(id);
+
+function render(){
+  const item=QUIZ[idx];
+  $("count").textContent=(idx+1)+" / "+QUIZ.length;
+  $("bar").style.width=((idx+1)/QUIZ.length*100)+"%";
+  $("question").textContent=item.q;
+  $("explain").className="explain"; $("explain").innerHTML="";
+  $("next").classList.add("hidden");
+  $("next").textContent = idx===QUIZ.length-1 ? "結果を見る →" : "次の問題 →";
+  const wrap=$("opts"); wrap.innerHTML=""; locked=false;
+  item.opts.forEach((t,i)=>{
+    const b=document.createElement("button");
+    b.className="opt";
+    b.innerHTML='<span class="key">'+keys[i]+'</span>'+t;
+    b.onclick=()=>choose(i,b);
+    wrap.appendChild(b);
+  });
+}
+function choose(i,btn){
+  if(locked)return; locked=true;
+  const item=QUIZ[idx];
+  const all=document.querySelectorAll(".opt");
+  all.forEach((b,j)=>{b.classList.add("disabled");
+    if(j===item.answer)b.classList.add("correct");});
+  if(i===item.answer){score++;}
+  else{btn.classList.add("wrong");}
+  $("explain").innerHTML=(i===item.answer?"正解！ ":"おしい！ ")+item.exp;
+  $("explain").classList.add("show");
+  $("next").classList.remove("hidden");
+}
+$("next").onclick=()=>{
+  if(idx<QUIZ.length-1){idx++;render();}
+  else{showResult();}
+};
+function showResult(){
+  $("quiz").style.display="none";
+  $("result").classList.add("show");
+  $("final").textContent=score;
+  const msgs=["復習すればもっと伸びます。もう一度挑戦してみましょう！",
+    "あと少し！間違えた問題を見直してみましょう。",
+    "いい調子です。この調子で復習しましょう！",
+    "すばらしい理解度です！",
+    "全問正解！理科マスターですね 🎉"];
+  $("msg").textContent=msgs[score];
+}
+$("retry").onclick=()=>{idx=0;score=0;
+  $("result").classList.remove("show");$("quiz").style.display="block";render();};
+render();
+</script>
+</body>
+</html>
