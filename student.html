@@ -22,6 +22,11 @@
   .veil{position:absolute;inset:0;background:rgba(251,241,221,.82);border-radius:14px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;font-weight:800;color:var(--sage-d)}
   .scorebox{text-align:center;background:#fff;border:2px solid var(--gold);border-radius:16px;padding:16px;margin-top:12px}
   .scorebox .big-num{font-size:2.6rem}
+  .compare{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  @media(max-width:680px){.compare{grid-template-columns:1fr}}
+  .compare-label{font-weight:800;text-align:center;margin-bottom:6px}
+  #guessCol .compare-label{color:var(--sage-d)}
+  #answerLabel{color:var(--peach-d)}
   .tip{font-size:.8rem;color:var(--ink-soft);text-align:center;margin-top:6px}
 </style>
 </head>
@@ -60,8 +65,17 @@
 
   <!-- 結果 -->
   <div id="resultBox" class="hidden">
-    <div class="banner build">🎉 正解はこちら！</div>
-    <div id="answerScene"></div>
+    <div class="banner build">🎉 けっか — あなたの予想とせいかいをくらべよう</div>
+    <div class="compare" id="compareWrap">
+      <div class="compare-col" id="guessCol">
+        <div class="compare-label">✏️ あなたの予想</div>
+        <div id="myGuessScene"></div>
+      </div>
+      <div class="compare-col">
+        <div class="compare-label" id="answerLabel">⭕ せいかい</div>
+        <div id="answerScene"></div>
+      </div>
+    </div>
     <div class="scorebox" id="myScoreBox"></div>
   </div>
 </div>
@@ -89,11 +103,12 @@ if(meRef){ meRef.child('joinedAt').once('value').then(s=>{ if(!s.exists()) meRef
 const editorScene=new Scene(document.getElementById('editorScene'),{editable:true,onChange:onEdit});
 const ownScene=new Scene(document.getElementById('ownScene'),{editable:false});
 const answerScene=new Scene(document.getElementById('answerScene'),{editable:false});
+const myGuessScene=new Scene(document.getElementById('myGuessScene'),{editable:false});
 const palette=buildPalette(document.getElementById('tray'),editorScene);
 function onEdit(){ palette.refresh(); }
 
 // 再描画時のレイアウト追従
-window.addEventListener('resize',()=>{ editorScene.relayout(); ownScene.relayout(); answerScene.relayout(); });
+window.addEventListener('resize',()=>{ editorScene.relayout(); ownScene.relayout(); answerScene.relayout(); myGuessScene.relayout(); });
 
 // 状態追従用フラグ
 let buildLoaded=false, guessRound=-1;
@@ -194,10 +209,23 @@ function renderExplain(){
 function renderResult(){
   show('resultBox');
   const res=session.result||{};
+  const isExplainer = res.explainer===N;
+
+  // せいかい（出題者の部屋）
   answerScene.setState(res.target||{});
-  setTimeout(()=>answerScene.relayout(),50);
+  // あなたの予想（今ラウンドの提出。出題者は予想なし）
+  const g=me().guess;
+  const myObjs = (!isExplainer && g && g.round===res.round) ? (g.objects||{}) : {};
+  myGuessScene.setState(myObjs);
+  setTimeout(()=>{ answerScene.relayout(); myGuessScene.relayout(); },50);
+
+  // 出題者は「予想」列を隠し、正解だけを表示
+  document.getElementById('guessCol').style.display = isExplainer ? 'none' : '';
+  document.getElementById('compareWrap').style.gridTemplateColumns = isExplainer ? '1fr' : '';
+  document.getElementById('answerLabel').textContent = isExplainer ? '⭐ あなたの出題（せいかい）' : '⭕ せいかい';
+
   const box=document.getElementById('myScoreBox');
-  if(res.explainer===N){
+  if(isExplainer){
     box.innerHTML='🎤 あなたが出題者でした！';
   } else {
     const mine=(res.ranking||[]).find(r=>r.n===N);
