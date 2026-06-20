@@ -255,6 +255,18 @@ function scoreGuess(target, guess) {
   return Math.round((sum / OBJECTS.length) * 100);
 }
 
+/* 1〜3位の「表彰台」HTML（児童・先生で共通表示）。big=true で投影用に大きく */
+function topThreeHTML(ranking, big) {
+  const medals = ['🥇', '🥈', '🥉'];
+  const top = (ranking || []).slice(0, 3);
+  if (top.length === 0) return '<div class="muted">ていしゅつがありませんでした</div>';
+  const items = top.map((r, i) =>
+    `<div class="podium-item p${i + 1}"><div class="medal">${medals[i]}</div>` +
+    `<div class="pnum">${r.n}<span>番</span></div><div class="pscore">${r.score}点</div></div>`
+  ).join('');
+  return `<div class="podium${big ? ' big' : ''}">${items}</div>`;
+}
+
 /* ------------------------------------------------------- 画像として保存 */
 async function exportSceneImage(sceneEl, filename) {
   if (typeof html2canvas === 'undefined') { alert('画像ライブラリの読み込みに失敗しました'); return; }
