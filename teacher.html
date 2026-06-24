@@ -35,10 +35,20 @@
 <body>
 <div class="top">
   <span class="code" id="codeLabel">―</span>
+  <button class="btn ghost" style="padding:.3em 1em;font-size:.9rem" onclick="showRoomBig()">🔍 ルーム番号を拡大</button>
   <span class="tag" id="phaseTag">接続中…</span>
   <span class="tag" id="modeTag"></span>
   <span class="tag dot off" id="connTag">未接続</span>
   <span style="margin-left:auto" class="muted">児童アクセス: <b id="joinUrl">index.html</b></span>
+</div>
+
+<!-- ルーム番号の拡大表示（投影用） -->
+<div id="roomBig" onclick="hideRoomBig()" style="display:none;position:fixed;inset:0;z-index:80;background:var(--cream);
+     flex-direction:column;align-items:center;justify-content:center;text-align:center;cursor:pointer;gap:10px;padding:20px">
+  <div class="muted" style="font-size:1.6rem;font-weight:700">ホーム画面で「ルーム番号」に入力してね</div>
+  <div id="roomBigNum" class="big-num" style="font-size:clamp(5rem,26vw,22rem)">―</div>
+  <div class="muted" style="font-size:1.2rem" id="roomBigUrl"></div>
+  <div class="muted" style="margin-top:10px">画面をタップでとじる</div>
 </div>
 
 <div class="layout">
@@ -143,20 +153,35 @@
       <h3>ルーム</h3>
       <button class="btn full" style="background:#C0563F" onclick="endClass()">■ 終了する</button>
       <div class="step-hint">児童をホーム画面にもどし、このルーム番号（データ）を削除します。</div>
+      <button class="btn ghost full" style="margin-top:10px" onclick="teacherLogout()">ログアウト</button>
     </div>
   </div>
 </div>
 
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="firebase-config.js"></script>
 <script src="common.js"></script>
 <script>
+const auth = dbReady ? firebase.auth() : null;
 const params = new URLSearchParams(location.search);
 const CODE = (params.get('code')||'').toUpperCase();
 const URL_MODE = params.get('mode')||'';
 document.getElementById('codeLabel').textContent = 'ルーム '+CODE;
 document.getElementById('joinUrl').textContent = location.host + location.pathname.replace('teacher.html','index.html');
+
+// 認証ガード：未ログインなら入口へ
+if(auth){ auth.onAuthStateChanged(u=>{ if(!u) location.replace('index.html'); }); }
+function teacherLogout(){ if(auth) auth.signOut().then(()=>location.replace('index.html')); else location.replace('index.html'); }
+
+// ルーム番号の拡大表示（投影用）
+function showRoomBig(){
+  document.getElementById('roomBigNum').textContent = CODE;
+  document.getElementById('roomBigUrl').textContent = location.host + location.pathname.replace('teacher.html','index.html');
+  document.getElementById('roomBig').style.display = 'flex';
+}
+function hideRoomBig(){ document.getElementById('roomBig').style.display = 'none'; }
 
 if(!dbReady){ document.getElementById('phaseTag').textContent='Firebase未設定'; alert('firebase-config.js を設定してください'); }
 const ref = dbReady ? db.ref('sessions/'+CODE) : null;

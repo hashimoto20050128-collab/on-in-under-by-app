@@ -17,32 +17,50 @@ classroom-en/
 ├ common.js           配置エンジン・採点ロジック
 ├ styles.css          デザイン
 ├ firebase-config.js  ★ここに自分のFirebase設定を入れる
-├ app-config.js       ★講師の利用コードを設定
-└ assets/             背景と物の画像（bg / lamp / pencil / ball / book / plant）
+└ assets/             背景と物の画像（bg / lamp / pencil / ball / book / plant / clock）
 ```
 
-## 2. Firebase の準備（5分）
+## 2. Firebase の準備
 1. [Firebase コンソール](https://console.firebase.google.com/) で新規プロジェクトを作成。
-2. 左メニュー **構築 → Realtime Database** を作成（ロケーションは任意、テストモードで開始）。
-3. **プロジェクトの設定 → マイアプリ → ウェブアプリ（</>）** を追加し、表示される `firebaseConfig` の値をコピー。
+2. 左メニュー **Realtime Database** を作成（ロケーションは asia-southeast1 など。最初はテストモードでOK）。
+3. **プロジェクトの設定 → マイアプリ → ウェブアプリ（</>）** を追加し、`firebaseConfig` の値をコピー。
 4. `firebase-config.js` の上部を、その値で書きかえる（特に `databaseURL` を忘れずに）。
 
-### データベースのルール（授業期間中の簡易設定）
-テスト用に全許可で動きます。ただし誰でも読み書きできるため、**授業期間だけ**にするか、下記のように簡単なクラスコード制限を推奨します。
+### 2-1. 先生ログイン（Firebase Authentication）
+ルームの発行・進行・削除は「ログインした先生」だけができます。児童はログイン不要です。
+1. 左メニュー **Authentication → 始める** → **Sign-in method** で **メール／パスワード** を有効化。
+2. **Users → ユーザーを追加** で、先生のメールアドレスとパスワードを作成（必要な人数ぶん）。
+3. 追加した各ユーザーの **UID**（一覧に表示されます）をコピー。
+4. Realtime Database に、許可する先生の一覧を登録します。**Realtime Database → データ** で、次の形のデータを手で追加してください（コンソールから直接書けます）。
+   ```
+   teachers
+     └ （先生のUID） : true
+     └ （別の先生のUID） : true
+   ```
+
+### 2-2. セキュリティルール（これが本当の制限です）
+**Realtime Database → ルール** に下記を貼り付けて「公開」。これで「ルームの作成・進行・削除は許可された先生UIDだけ」「児童は参加データのみ書き込み可」になります。
 ```json
 {
   "rules": {
     "sessions": {
-      "$code": { ".read": true, ".write": true }
+      ".read": true,
+      "$room": {
+        ".write": "auth != null && root.child('teachers').child(auth.uid).exists()",
+        "students": { ".write": true },
+        "groups":   { ".write": true }
+      }
+    },
+    "teachers": {
+      "$uid": { ".read": "auth != null && auth.uid === $uid", ".write": false }
     }
   }
 }
 ```
-> 本番運用や長期公開では Firebase Authentication を併用してください。
+> `teachers` への追加はコンソールから管理者が行います（クライアントからは書けません）。先生を増減するときは `teachers` の下を編集してください。
 
-## 2.5 利用コード・ルーム番号・モード
-- **講師の利用コード**：先生がルームを発行するには `app-config.js` の `TEACHER_CODES` のコードが必要です（例 `"sensei-2026"`）。配布相手に応じて自由に変更・追加できます。※簡易的な制限で、ソースを見れば分かる程度の強さです。
-- **ルーム番号**：先生がモードを選んで発行すると、重複しない4桁のルーム番号が自動で割り当てられます。児童はこの番号で参加します。
+## 2.5 ルーム番号・モード
+- **ルーム番号**：先生がログインして「ルームを発行」を押すと、重複しない4桁のルーム番号が自動で割り当てられます。児童はこの番号で参加します。先生画面の「🔍 ルーム番号を拡大」で、投影用に大きく表示できます。
 - **モード**：
   - *クラス全体モード* … 1人が説明し、クラス全員が予想。上位3名（出席番号）を表示。
   - *ペア・グループモード* … グループ内で交代しながら相手の部屋を説明し合い、**一致率（％）** を表示。「つぎの人へ」で交代します（先生はスタート／終了のみ）。

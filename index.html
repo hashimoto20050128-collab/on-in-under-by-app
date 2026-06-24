@@ -39,12 +39,24 @@
 
     <!-- 先生 -->
     <div id="teacherForm" class="form">
-      <label>講師用 利用コード</label>
-      <input id="tKey" placeholder="利用コードを入力">
-      <button class="btn full big" style="margin-top:14px" onclick="issueRoom()">ルームを発行 ▶</button>
-      <div class="muted" style="font-size:.8rem;margin-top:8px">発行後、先生画面で「クラス全体／ペア・グループ」を切り替えられます。</div>
+      <!-- ログイン -->
+      <div id="loginBox">
+        <label>メールアドレス</label>
+        <input id="tEmail" type="email" autocomplete="username" placeholder="teacher@example.com">
+        <label>パスワード</label>
+        <input id="tPass" type="password" autocomplete="current-password" placeholder="パスワード">
+        <button class="btn full big" style="margin-top:14px" onclick="teacherLogin()">ログイン ▶</button>
+        <div id="loginMsg" class="muted" style="margin-top:10px;font-size:.85rem"></div>
+      </div>
+      <!-- ログイン後：ルーム発行 -->
+      <div id="issueBox" style="display:none">
+        <div class="muted" style="font-size:.85rem">ログイン中：<b id="who"></b></div>
+        <button class="btn full big" style="margin-top:12px" onclick="issueRoom()">ルームを発行 ▶</button>
+        <div class="muted" style="font-size:.8rem;margin-top:8px">発行後、先生画面で「クラス全体／ペア・グループ」を切り替えられます。</div>
+        <button class="btn ghost full" style="margin-top:8px" onclick="teacherLogout()">ログアウト</button>
+        <div id="issueMsg" class="muted" style="margin-top:10px;font-size:.85rem"></div>
+      </div>
       <button class="btn ghost full" style="margin-top:8px" onclick="reset()">もどる</button>
-      <div id="issueMsg" class="muted" style="margin-top:10px;font-size:.85rem"></div>
     </div>
 
     <!-- 児童 -->
@@ -63,20 +75,46 @@
 
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="firebase-config.js"></script>
-<script src="app-config.js"></script>
 <script>
   if (!dbReady) document.getElementById('warn').style.display = 'block';
+  const auth = dbReady ? firebase.auth() : null;
+
   function pick(role){
     document.getElementById('rolePick').style.display='none';
     document.getElementById(role+'Form').classList.add('show');
+    if(role==='teacher') updateTeacherUI();
   }
   function reset(){
     document.getElementById('rolePick').style.display='grid';
     document.querySelectorAll('.form').forEach(f=>f.classList.remove('show'));
   }
 
-  // ルーム番号を重複しないように発行
+  // ログイン状態でUIを切替
+  function updateTeacherUI(){
+    const u = auth && auth.currentUser;
+    document.getElementById('loginBox').style.display = u ? 'none' : 'block';
+    document.getElementById('issueBox').style.display = u ? 'block' : 'none';
+    if(u) document.getElementById('who').textContent = u.email || '先生';
+  }
+  if(auth){ auth.onAuthStateChanged(()=>{ if(document.getElementById('teacherForm').classList.contains('show')) updateTeacherUI(); }); }
+
+  async function teacherLogin(){
+    if(!auth){ alert('Firebase が未設定です'); return; }
+    const email=(document.getElementById('tEmail').value||'').trim();
+    const pass=document.getElementById('tPass').value||'';
+    const msg=document.getElementById('loginMsg'); msg.textContent='ログイン中…';
+    try{
+      await auth.signInWithEmailAndPassword(email,pass);
+      msg.textContent=''; updateTeacherUI();
+    }catch(e){
+      msg.textContent = (e.code==='auth/invalid-credential'||e.code==='auth/wrong-password'||e.code==='auth/user-not-found')
+        ? 'メールアドレスまたはパスワードが正しくありません。' : 'ログインに失敗しました: '+e.message;
+    }
+  }
+  function teacherLogout(){ if(auth) auth.signOut().then(updateTeacherUI); }
+
   async function genRoom(){
     for(let i=0;i<40;i++){
       const num=String(Math.floor(1000+Math.random()*9000));
@@ -86,18 +124,19 @@
     return null;
   }
   async function issueRoom(){
-    if(!dbReady){ alert('Firebase が未設定です'); return; }
-    const key=(document.getElementById('tKey').value||'').trim();
-    if(typeof TEACHER_CODES==='undefined' || !TEACHER_CODES.includes(key)){
-      alert('利用コードが正しくありません'); return;
-    }
+    if(!auth || !auth.currentUser){ alert('先生のログインが必要です'); return; }
     const msg=document.getElementById('issueMsg'); msg.textContent='ルームを発行中…';
     try{
       const num=await genRoom();
       if(!num){ msg.textContent=''; alert('発行に失敗しました。もう一度お試しください'); return; }
-      await db.ref('sessions/'+num).set({ mode:'class', phase:'lobby', allowResize:false, createdAt:Date.now() });
+      await db.ref('sessions/'+num).set({ mode:'class', phase:'lobby', allowResize:false, owner:auth.currentUser.uid, createdAt:Date.now() });
       location.href='teacher.html?code='+num;
-    }catch(e){ msg.textContent=''; alert('発行に失敗しました: '+e.message); }
+    }catch(e){
+      msg.textContent='';
+      if(e.code==='PERMISSION_DENIED'||/permission/i.test(e.message))
+        alert('このアカウントにはルーム発行の権限がありません。管理者に連絡してください。');
+      else alert('発行に失敗しました: '+e.message);
+    }
   }
 
   function goStudent(){
