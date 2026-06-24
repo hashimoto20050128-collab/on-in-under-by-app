@@ -10,7 +10,7 @@
 <style>
   .wrap{min-height:100%;display:flex;align-items:center;justify-content:center;padding:24px}
   .card{max-width:520px;width:100%;padding:30px 28px;text-align:center}
-  .logo{font-family:"Baloo 2",sans-serif;font-weight:800;font-size:2.1rem;color:var(--peach-d);letter-spacing:.5px}
+  .logo{font-family:"Baloo 2",sans-serif;font-weight:800;font-size:2rem;color:var(--peach-d);letter-spacing:.5px}
   .logo small{display:block;font-size:1rem;color:var(--ink-soft);font-weight:700;margin-top:4px}
   .hero{width:100%;border-radius:14px;margin:18px 0 8px;box-shadow:var(--shadow)}
   .choice{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:18px}
@@ -33,35 +33,38 @@
     <img class="hero" src="assets/bg.png" alt="お部屋">
 
     <div id="rolePick" class="choice">
-      <button onclick="pick('teacher')"><span class="ic">🧑‍🏫</span>先生<br><span class="muted" style="font-size:.8rem;font-weight:700">進行・投影</span></button>
-      <button onclick="pick('student')"><span class="ic">🧒</span>児童<br><span class="muted" style="font-size:.8rem;font-weight:700">じぶんの端末</span></button>
+      <button onclick="pick('teacher')"><span class="ic">🧑‍🏫</span>先生<br><span class="muted" style="font-size:.8rem;font-weight:700">ルーム発行・進行</span></button>
+      <button onclick="pick('student')"><span class="ic">🧒</span>児童<br><span class="muted" style="font-size:.8rem;font-weight:700">ルーム番号で参加</span></button>
     </div>
 
     <!-- 先生 -->
     <div id="teacherForm" class="form">
-      <label>クラスコード（半角英数・例: 6A）</label>
-      <input id="tCode" maxlength="8" placeholder="6A" autocapitalize="characters">
-      <button class="btn full big" style="margin-top:16px" onclick="goTeacher()">クラスをひらく ▶</button>
+      <label>講師用 利用コード</label>
+      <input id="tKey" placeholder="利用コードを入力">
+      <button class="btn full big" style="margin-top:14px" onclick="issueRoom()">ルームを発行 ▶</button>
+      <div class="muted" style="font-size:.8rem;margin-top:8px">発行後、先生画面で「クラス全体／ペア・グループ」を切り替えられます。</div>
       <button class="btn ghost full" style="margin-top:8px" onclick="reset()">もどる</button>
+      <div id="issueMsg" class="muted" style="margin-top:10px;font-size:.85rem"></div>
     </div>
 
     <!-- 児童 -->
     <div id="studentForm" class="form">
-      <label>クラスコード</label>
-      <input id="sCode" maxlength="8" placeholder="6A" autocapitalize="characters">
+      <label>ルーム番号</label>
+      <input id="sCode" type="number" inputmode="numeric" placeholder="1234">
       <label>出席番号</label>
       <input id="sNum" type="number" inputmode="numeric" min="1" max="99" placeholder="12">
       <button class="btn full big" style="margin-top:16px" onclick="goStudent()">さんかする ▶</button>
       <button class="btn ghost full" style="margin-top:8px" onclick="reset()">もどる</button>
     </div>
 
-    <div id="warn" class="warn">⚠️ Firebase が未設定です。<code>firebase-config.js</code> にあなたのプロジェクトの値を入力すると、クラス全員で同期できます（READMEを参照）。</div>
+    <div id="warn" class="warn">⚠️ Firebase が未設定です。<code>firebase-config.js</code> にあなたのプロジェクトの値を入力してください（READMEを参照）。</div>
   </div>
 </div>
 
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
 <script src="firebase-config.js"></script>
+<script src="app-config.js"></script>
 <script>
   if (!dbReady) document.getElementById('warn').style.display = 'block';
   function pick(role){
@@ -72,16 +75,35 @@
     document.getElementById('rolePick').style.display='grid';
     document.querySelectorAll('.form').forEach(f=>f.classList.remove('show'));
   }
-  function norm(v){return (v||'').trim().toUpperCase();}
-  function goTeacher(){
-    const c=norm(document.getElementById('tCode').value);
-    if(!c){alert('クラスコードを入力してください');return;}
-    location.href='teacher.html?code='+encodeURIComponent(c);
+
+  // ルーム番号を重複しないように発行
+  async function genRoom(){
+    for(let i=0;i<40;i++){
+      const num=String(Math.floor(1000+Math.random()*9000));
+      const snap=await db.ref('sessions/'+num).once('value');
+      if(!snap.exists()) return num;
+    }
+    return null;
   }
+  async function issueRoom(){
+    if(!dbReady){ alert('Firebase が未設定です'); return; }
+    const key=(document.getElementById('tKey').value||'').trim();
+    if(typeof TEACHER_CODES==='undefined' || !TEACHER_CODES.includes(key)){
+      alert('利用コードが正しくありません'); return;
+    }
+    const msg=document.getElementById('issueMsg'); msg.textContent='ルームを発行中…';
+    try{
+      const num=await genRoom();
+      if(!num){ msg.textContent=''; alert('発行に失敗しました。もう一度お試しください'); return; }
+      await db.ref('sessions/'+num).set({ mode:'class', phase:'lobby', allowResize:false, createdAt:Date.now() });
+      location.href='teacher.html?code='+num;
+    }catch(e){ msg.textContent=''; alert('発行に失敗しました: '+e.message); }
+  }
+
   function goStudent(){
-    const c=norm(document.getElementById('sCode').value);
+    const c=(document.getElementById('sCode').value||'').trim();
     const n=parseInt(document.getElementById('sNum').value,10);
-    if(!c){alert('クラスコードを入力してください');return;}
+    if(!c){alert('ルーム番号を入力してください');return;}
     if(!n||n<1){alert('出席番号を入力してください');return;}
     location.href='student.html?code='+encodeURIComponent(c)+'&n='+n;
   }

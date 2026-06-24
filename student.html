@@ -43,6 +43,7 @@
 <div class="top">
   <span class="me" id="meLabel">―</span>
   <span class="tag" id="phaseTag">接続中…</span>
+  <span class="tag" id="groupTag" style="display:none"></span>
   <span class="tag dot off" id="connTag" style="margin-left:auto">未接続</span>
 </div>
 
@@ -53,23 +54,40 @@
     <div id="waitMsg" style="font-weight:700">先生の合図をまっています…</div>
   </div>
 
+  <!-- グループ番号入力（手動：児童が相手を選ぶ） -->
+  <div id="groupGate" class="wait hidden">
+    <div class="em">👥</div>
+    <div style="font-weight:700">いっしょに組む人とグループを作ろう</div>
+    <div class="muted" style="font-size:.85rem;max-width:360px;text-align:center">ペア・グループの中で<b>いちばん小さい出席番号</b>を、全員で同じように入力してね（例：12番と13番なら「12」）</div>
+    <input id="groupInput" type="number" inputmode="numeric" min="1" max="99" placeholder="12"
+      style="font-family:inherit;font-size:1.3rem;width:160px;text-align:center;padding:.5em;border:2px solid var(--line);border-radius:12px">
+    <button class="btn" onclick="setGroup()">けってい ▶</button>
+  </div>
+
   <!-- 配置エディタ（配置タイム／予想タイム共用） -->
   <div id="editBox" class="hidden">
     <div class="banner" id="editBanner"></div>
     <div class="fs-bar"><button class="btn ghost" id="fsBtn" onclick="toggleExpand()">⛶ 大きく表示</button></div>
     <div class="submitted-veil">
       <div id="editorScene"></div>
-      <div class="veil hidden" id="editVeil"><div class="em">✅</div><div id="veilMsg">提出しました！</div><button class="btn ghost" id="reeditBtn">やり直す</button></div>
+      <div class="veil hidden" id="editVeil"><div class="em">✅</div><div id="veilMsg">提出しました！</div>
+        <button class="btn ghost" id="reeditBtn">やり直す</button>
+        <button class="btn hidden" id="veilNext" onclick="pairNext()">つぎの人へ ▶</button>
+      </div>
     </div>
     <div class="tray" id="tray" style="margin-top:12px;justify-content:center"></div>
     <div class="actions" id="editActions"></div>
     <div class="tip">物をタップでトレイから出し入れ／ドラッグで移動。✕でもどす。</div>
   </div>
 
-  <!-- 出題者（説明する人） -->
+  <!-- 出題者（説明する人）／ペアの説明者 -->
   <div id="explainBox" class="hidden">
-    <div class="banner guess">🎤 あなたが説明する番です！ お部屋を英語で説明しよう</div>
+    <div class="banner guess" id="explainBanner">🎤 あなたが説明する番です！ お部屋を英語で説明しよう</div>
     <div id="ownScene"></div>
+    <div id="pairExtra" class="hidden">
+      <div id="pairMatches" class="muted" style="text-align:center;margin-top:10px"></div>
+      <button class="btn full big" style="margin-top:10px" onclick="pairNext()">つぎの人へ ▶（交代）</button>
+    </div>
     <div class="tip">例: The ball is on the table. / The lamp is under the table.</div>
   </div>
 
@@ -144,7 +162,7 @@ function toggleExpand(){
 window.addEventListener('resize',()=>{ fitEditor(); ownScene.relayout(); answerScene.relayout(); myGuessScene.relayout(); });
 
 // 状態追従用フラグ
-let buildLoaded=false, guessRound=-1;
+let buildLoaded=false, guessRound=-1, pairRound=-1;
 
 if(ref){
   ref.on('value',snap=>{
@@ -155,11 +173,23 @@ if(ref){
   },err=>{ document.getElementById('connTag').textContent='接続エラー'; });
 }
 
-const PHASE_JA={lobby:'説明',build:'配置タイム',guess:'予想タイム',result:'結果'};
+const PHASE_JA={lobby:'説明',build:'配置タイム',guess:'予想タイム',result:'結果',pair:'ペア活動'};
 function me(){ return (session.students&&session.students[N])||{}; }
+function mode(){ return session.mode||'class'; }
+function groupModeOf(){ return session.groupMode||'random'; }
+function groupAll(g){ // そのグループの全員（提出は問わない）
+  const st=session.students||{};
+  return Object.keys(st).map(Number).filter(n=>!isNaN(n))
+    .filter(n=>String(st[n].group)===String(g)).sort((a,b)=>a-b);
+}
+function groupMembers(g){ // そのグループで部屋を提出ずみのメンバー（出席番号順）
+  const st=session.students||{};
+  return Object.keys(st).map(Number).filter(n=>!isNaN(n))
+    .filter(n=>String(st[n].group)===String(g) && st[n].buildSubmitted).sort((a,b)=>a-b);
+}
 
 function show(id){
-  ['waitBox','editBox','explainBox','resultBox'].forEach(b=>{
+  ['waitBox','groupGate','editBox','explainBox','resultBox'].forEach(b=>{
     document.getElementById(b).classList.toggle('hidden', b!==id);
   });
   if(id!=='editBox' && editBox.classList.contains('fs')){
@@ -173,9 +203,19 @@ function render(){
   const phase=session.phase||'lobby';
   if(phase==='ended'){ location.replace('index.html'); return; }
   document.getElementById('phaseTag').textContent=PHASE_JA[phase]||phase;
+  const gt=document.getElementById('groupTag');
+  if(mode()==='pair' && me().group!=null){ gt.style.display=''; gt.textContent='グループ'+me().group; }
+  else { gt.style.display='none'; }
   editorScene.setAllowResize(!!session.allowResize);
 
   if(phase!=='build') buildLoaded=false;
+  if(phase!=='pair' && phase!=='guess') pairRound=-1;
+
+  // グループ未設定のとき
+  if(mode()==='pair' && me().group==null){
+    if(phase==='pair'){ show('groupGate'); return; }                       // 活動開始時はいつでも自分で入力できる（保険）
+    if(groupModeOf()==='manual' && phase==='build'){ show('groupGate'); return; } // 手動は配置タイム中から組める
+  }
 
   if(phase==='lobby'){
     show('waitBox');
@@ -187,13 +227,28 @@ function render(){
     else { renderGuess(); }
   }
   else if(phase==='result'){ renderResult(); }
+  else if(phase==='pair'){ renderPair(); }
 }
+
+function setGroup(){
+  const g=parseInt(document.getElementById('groupInput').value,10);
+  if(!g||g<1){ alert('グループ番号を入力してください'); return; }
+  meRef.child('group').set(g);
+}
+function changeGroup(){ meRef.child('group').set(null); }
 
 /* 配置タイム */
 function renderBuild(){
   show('editBox');
   document.getElementById('editBanner').className='banner build';
-  document.getElementById('editBanner').innerHTML='✏️ じぶんのお部屋を作ろう → できたら「提出」';
+  let banner='✏️ じぶんのお部屋を作ろう → できたら「提出」';
+  if(mode()==='pair' && me().group!=null){
+    const mem=groupAll(me().group).join('・');
+    banner+=`<div style="font-weight:700;margin-top:6px;font-size:.95rem">👥 グループ${me().group}（${mem}）`;
+    if(groupModeOf()==='manual') banner+=` <button class="btn ghost" style="padding:.2em .8em;font-size:.8rem" onclick="changeGroup()">変更</button>`;
+    banner+='</div>';
+  }
+  document.getElementById('editBanner').innerHTML=banner;
   if(!buildLoaded){
     editorScene.setState(me().build||{});
     palette.refresh();
@@ -242,8 +297,84 @@ function submitGuess(){
 /* 出題者画面 */
 function renderExplain(){
   show('explainBox');
+  document.getElementById('explainBanner').innerHTML='🎤 あなたが説明する番です！ お部屋を英語で説明しよう';
+  document.getElementById('pairExtra').classList.add('hidden');
   ownScene.setState(me().build||{});
   setTimeout(()=>ownScene.relayout(),50);
+}
+
+/* ===== ペア・グループモード ===== */
+function initGroup(g){
+  const gref=ref.child('groups/'+g);
+  gref.once('value').then(s=>{
+    if(!s.exists()){
+      const members=groupMembers(g);
+      if(members.length>0) gref.set({describer:members[0],round:1});
+    }
+  });
+}
+function renderPair(){
+  const g=me().group;
+  const grp=(session.groups&&session.groups[g])||null;
+  if(!grp){ show('waitBox'); document.getElementById('waitMsg').textContent='グループの準備中…'; initGroup(g); return; }
+  if(grp.describer===N) renderPairDescriber(g,grp);
+  else renderPairGuesser(g,grp);
+}
+function renderPairDescriber(g,grp){
+  show('explainBox');
+  document.getElementById('explainBanner').innerHTML='🎤 あなたの番！ お部屋を英語で説明しよう（グループ '+g+'）';
+  ownScene.setState(me().build||{});
+  setTimeout(()=>ownScene.relayout(),50);
+  document.getElementById('pairExtra').classList.remove('hidden');
+  // メンバーの一致率
+  const others=groupMembers(g).filter(n=>n!==N);
+  const st=session.students||{};
+  const html=others.map(n=>{
+    const pg=st[n].pguess;
+    if(pg&&pg.submitted&&pg.round===grp.round){
+      const rate=scoreGuess(me().build||{}, pg.objects||{});
+      return `${n}番：<b style="color:var(--sage-d)">一致率 ${rate}%</b>`;
+    }
+    return `${n}番：予想中…`;
+  }).join(' ／ ');
+  document.getElementById('pairMatches').innerHTML = others.length? html : 'グループに予想する人がいません';
+}
+function renderPairGuesser(g,grp){
+  show('editBox');
+  document.getElementById('editBanner').className='banner guess';
+  document.getElementById('editBanner').innerHTML='👂 '+grp.describer+'番の説明を聞いて、予想して配置 → 「提出」';
+  if(pairRound!==grp.round){ editorScene.setState({}); palette.refresh(); pairRound=grp.round; }
+  const pg=me().pguess;
+  const submitted=pg&&pg.submitted&&pg.round===grp.round;
+  const veil=document.getElementById('editVeil');
+  veil.classList.toggle('hidden', !submitted);
+  if(submitted){
+    const desc=(session.students&&session.students[grp.describer])||{};
+    const rate=scoreGuess(desc.build||{}, pg.objects||{});
+    document.getElementById('veilMsg').innerHTML='一致率 <span class="big-num" style="font-size:2rem">'+rate+'</span>％ ✅';
+    document.getElementById('veilNext').classList.remove('hidden');
+  } else {
+    document.getElementById('veilNext').classList.add('hidden');
+  }
+  document.getElementById('reeditBtn').onclick=()=>{ meRef.child('pguess/submitted').set(false); };
+  const a=document.getElementById('editActions'); a.innerHTML='';
+  a.appendChild(mkBtn('提出する ▶','big sage',submitPair));
+  fitEditor();
+}
+function submitPair(){
+  const g=me().group; const grp=(session.groups&&session.groups[g])||{round:1};
+  meRef.child('pguess').set({ round:grp.round, objects:editorScene.getState(), submitted:true });
+}
+function pairNext(){
+  const g=me().group; const grp=(session.groups&&session.groups[g]); if(!grp) return;
+  const members=groupMembers(g); if(members.length===0) return;
+  const idx=members.indexOf(grp.describer);
+  const nextD=members[(idx+1)%members.length];
+  const updates={};
+  updates['groups/'+g+'/describer']=nextD;
+  updates['groups/'+g+'/round']=(grp.round||1)+1;
+  members.forEach(n=>{ updates['students/'+n+'/pguess']=null; });
+  ref.update(updates);
 }
 
 /* 結果 */

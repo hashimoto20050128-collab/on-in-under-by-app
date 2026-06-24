@@ -36,6 +36,7 @@
 <div class="top">
   <span class="code" id="codeLabel">―</span>
   <span class="tag" id="phaseTag">接続中…</span>
+  <span class="tag" id="modeTag"></span>
   <span class="tag dot off" id="connTag">未接続</span>
   <span style="margin-left:auto" class="muted">児童アクセス: <b id="joinUrl">index.html</b></span>
 </div>
@@ -80,13 +81,50 @@
       <div style="margin-top:6px;font-weight:700" class="muted">いちばん近かった3人</div>
       <div id="podium" style="margin-top:6px"></div>
     </div>
+    <!-- pair -->
+    <div id="s-pair" class="hidden">
+      <div class="phase-title">ペア・グループ活動中 👥</div>
+      <p class="muted">グループ内で交代しながら、相手の部屋を英語で説明 → 予想して配置（一致率が出ます）</p>
+      <div id="pairGroups" style="margin-top:14px;display:flex;flex-wrap:wrap;gap:14px;justify-content:center"></div>
+    </div>
   </div>
 
   <!-- 操作パネル -->
   <div class="dock">
     <div class="panel">
+      <h3>モード</h3>
+      <div class="switch">
+        <span id="modeLabel">クラス全体</span>
+        <button class="btn ghost" id="modeBtn" onclick="toggleMode()">切替</button>
+      </div>
+      <div class="step-hint">同じルームのまま、クラス全体／ペア・グループを切り替えます。</div>
+    </div>
+    <div class="panel">
       <h3>進行</h3>
       <div class="stack" id="controls"><!-- フェーズごとにボタンを差し替え --></div>
+    </div>
+    <div class="panel" id="groupPanel" style="display:none">
+      <h3>グループ分け</h3>
+      <div class="row gap8" style="flex-wrap:wrap">
+        <span>方法</span>
+        <select id="groupMethod" onchange="onMethodChange()" style="font-family:inherit;font-size:.95rem;padding:.3em .5em;border:2px solid var(--line);border-radius:10px">
+          <option value="random">ランダム（自動）</option>
+          <option value="order">出席番号順（自動）</option>
+          <option value="manual">児童が相手を選ぶ（手動）</option>
+        </select>
+      </div>
+      <div class="row gap8" id="sizeRow" style="flex-wrap:wrap;margin-top:8px">
+        <span>1組の人数</span>
+        <select id="groupSize" style="font-family:inherit;font-size:.95rem;padding:.3em .5em;border:2px solid var(--line);border-radius:10px">
+          <option value="2">2人ペア（端数は3人）</option>
+          <option value="3">3人グループ</option>
+          <option value="4">4人グループ</option>
+        </select>
+      </div>
+      <button class="btn sage full" style="margin-top:10px" onclick="applyGrouping()">適用</button>
+      <button class="btn ghost full" style="margin-top:6px" onclick="clearGroups()">クリア</button>
+      <div class="step-hint" id="groupHint">参加者を自動で割り振ります（端数は3人組になります）。</div>
+      <div id="groupPreview" style="margin-top:8px;font-size:.85rem"></div>
     </div>
     <div class="panel">
       <h3>設定</h3>
@@ -102,9 +140,9 @@
       <div class="grid-nums" id="joinGrid" style="margin-top:8px"></div>
     </div>
     <div class="panel">
-      <h3>クラス</h3>
+      <h3>ルーム</h3>
       <button class="btn full" style="background:#C0563F" onclick="endClass()">■ 終了する</button>
-      <div class="step-hint">児童をホーム画面にもどし、このクラスのデータを削除します。</div>
+      <div class="step-hint">児童をホーム画面にもどし、このルーム番号（データ）を削除します。</div>
     </div>
   </div>
 </div>
@@ -116,12 +154,14 @@
 <script>
 const params = new URLSearchParams(location.search);
 const CODE = (params.get('code')||'').toUpperCase();
-document.getElementById('codeLabel').textContent = 'クラス '+CODE;
+const URL_MODE = params.get('mode')||'';
+document.getElementById('codeLabel').textContent = 'ルーム '+CODE;
 document.getElementById('joinUrl').textContent = location.host + location.pathname.replace('teacher.html','index.html');
 
 if(!dbReady){ document.getElementById('phaseTag').textContent='Firebase未設定'; alert('firebase-config.js を設定してください'); }
 const ref = dbReady ? db.ref('sessions/'+CODE) : null;
 let session = {};
+function mode(){ return session.mode || URL_MODE || 'class'; }
 let resultScene = new Scene(document.getElementById('resultScene'), {editable:false});
 window.addEventListener('resize',()=>resultScene.relayout());
 
@@ -129,7 +169,7 @@ window.addEventListener('resize',()=>resultScene.relayout());
 if(ref){
   ref.child('phase').once('value').then(s=>{
     if(!s.exists()){
-      ref.update({ phase:'lobby', allowResize:false, round:0, currentExplainer:null });
+      ref.update({ phase:'lobby', mode:URL_MODE||'class', allowResize:false, round:0, currentExplainer:null });
     }
   });
   ref.on('value', snap=>{
@@ -141,15 +181,26 @@ if(ref){
 }
 
 /* ---- 画面描画 ---- */
-const PHASE_JA = {lobby:'説明',build:'配置タイム',guess:'出題中',result:'結果発表',ended:'終了'};
+const PHASE_JA = {lobby:'説明',build:'配置タイム',guess:'出題中',result:'結果発表',pair:'ペア活動中',ended:'終了'};
 function students(){ return session.students||{}; }
 function listNums(filterFn){ return Object.keys(students()).map(Number).filter(n=>!isNaN(n)).filter(n=>!filterFn||filterFn(n)).sort((a,b)=>a-b); }
 
 function render(){
   const phase = session.phase||'lobby';
   document.getElementById('phaseTag').textContent = PHASE_JA[phase]||phase;
+  const isPair = mode()==='pair';
+  document.getElementById('modeTag').textContent = isPair ? 'ペア・グループ' : 'クラス全体';
+  document.getElementById('modeLabel').textContent = isPair ? 'ペア・グループ' : 'クラス全体';
+  document.getElementById('groupPanel').style.display = isPair ? '' : 'none';
+  if(isPair){
+    const byG={}; listNums().forEach(n=>{ const g=students()[n].group; if(g!=null)(byG[g]=byG[g]||[]).push(n); });
+    const keys=Object.keys(byG).sort((a,b)=>a-b);
+    document.getElementById('groupPreview').innerHTML = keys.length
+      ? keys.map(g=>`<div>グループ${g}：${byG[g].sort((a,b)=>a-b).join('・')}</div>`).join('')
+      : '<span class="muted">未割り当て（児童の手入力 or 自動分けを使用）</span>';
+  }
   // ステージ切替
-  ['lobby','build','guess','result'].forEach(p=>{
+  ['lobby','build','guess','result','pair'].forEach(p=>{
     document.getElementById('s-'+p).classList.toggle('hidden', p!==phase);
   });
   // リサイズ設定
@@ -166,6 +217,7 @@ function render(){
   if(phase==='build') renderBuild();
   if(phase==='guess') renderGuess();
   if(phase==='result') renderResult();
+  if(phase==='pair') renderPair();
   renderControls(phase);
 }
 
@@ -191,32 +243,117 @@ function renderResult(){
   setTimeout(()=>resultScene.relayout(),50);
   document.getElementById('podium').innerHTML = topThreeHTML(res.ranking, true);
 }
+function renderPair(){
+  // グループごとの進行状況
+  const groups=session.groups||{};
+  const byGroup={};
+  listNums().forEach(n=>{ const g=students()[n].group; if(g==null) return; (byGroup[g]=byGroup[g]||[]).push(n); });
+  const wrap=document.getElementById('pairGroups'); wrap.innerHTML='';
+  const keys=Object.keys(byGroup).sort((a,b)=>a-b);
+  if(keys.length===0){ wrap.innerHTML='<div class="muted">児童がグループ番号を入力すると、ここに表示されます。</div>'; return; }
+  keys.forEach(g=>{
+    const gr=groups[g]||{};
+    const desc=gr.describer;
+    const submitted=byGroup[g].filter(n=>{ const p=students()[n].pguess; return n!==desc && p && p.submitted && p.round===gr.round; }).length;
+    const card=document.createElement('div'); card.className='panel'; card.style.padding='14px 18px'; card.style.minWidth='150px';
+    card.innerHTML=`<div style="font-weight:800;color:var(--peach-d)">グループ ${g}</div>`+
+      `<div style="margin-top:6px">説明中：<b>${desc??'―'}</b> 番</div>`+
+      `<div class="muted" style="margin-top:2px">提出 ${submitted} ／ ${byGroup[g].length-1>0?byGroup[g].length-1:0} 人</div>`;
+    wrap.appendChild(card);
+  });
+}
 
 /* ---- 操作ボタン（フェーズ依存） ---- */
 function renderControls(phase){
   const c=document.getElementById('controls'); c.innerHTML='';
   const add=(label,cls,fn,dis)=>{ const b=document.createElement('button'); b.className='btn full '+cls; b.textContent=label; b.disabled=!!dis; b.onclick=fn; c.appendChild(b); };
+  const pair = mode()==='pair';
   if(phase==='lobby'){
     add('配置タイムを開始 ▶','big',startBuild);
   } else if(phase==='build'){
-    const ready=listNums(n=>students()[n].buildSubmitted).length>0;
-    add('出題スタート（出題者をえらぶ）▶','big',pickExplainer,!ready);
-    if(!ready) c.appendChild(hint('1人以上が提出すると押せます'));
+    if(pair){
+      const ready=listNums(n=>students()[n].buildSubmitted).length>0;
+      add('ペア活動スタート ▶','big sage',startPair,!ready);
+      if(!ready) c.appendChild(hint('1人以上が提出すると押せます'));
+    } else {
+      const ready=listNums(n=>students()[n].buildSubmitted).length>0;
+      add('出題スタート（出題者をえらぶ）▶','big',pickExplainer,!ready);
+      if(!ready) c.appendChild(hint('1人以上が提出すると押せます'));
+    }
   } else if(phase==='guess'){
     add('結果を発表 🎉','big sage',revealResults);
     add('別の出題者にかえる','ghost',pickExplainer);
   } else if(phase==='result'){
     add('次のラウンド ▶','big',pickExplainer);
     add('配置タイムにもどる','ghost',startBuild);
+  } else if(phase==='pair'){
+    add('配置タイムにもどる','ghost',startBuild);
+    c.appendChild(hint('交代はグループ内の「つぎの人へ」で進みます'));
   }
 }
 function hint(t){ const p=document.createElement('div'); p.className='step-hint'; p.textContent=t; return p; }
 
 /* ---- アクション ---- */
 function startBuild(){ ref.update({ phase:'build', currentExplainer:null, result:null }); }
+function startPair(){
+  // グループ状態と予想をクリアして開始
+  const updates={ phase:'pair', groups:null };
+  listNums().forEach(n=>{ updates['students/'+n+'/pguess']=null; });
+  ref.update(updates);
+}
+function toggleMode(){
+  const newMode = mode()==='pair' ? 'class' : 'pair';
+  const updates={ mode:newMode, currentExplainer:null, result:null, used:null, groups:null };
+  listNums().forEach(n=>{ updates['students/'+n+'/guess']=null; updates['students/'+n+'/pguess']=null; });
+  // ロビー以外なら配置タイムに戻して仕切り直し（作った部屋は残る）
+  if(session.phase!=='lobby' && session.phase!=='build') updates.phase='build';
+  ref.update(updates);
+}
+function onMethodChange(){
+  const m=document.getElementById('groupMethod').value;
+  document.getElementById('sizeRow').style.display = (m==='manual') ? 'none' : '';
+  document.getElementById('groupHint').textContent = (m==='manual')
+    ? '児童が「いっしょに組む相手の番号」を入力して組みます。配置タイム中に組ませておけます。'
+    : '参加者を自動で割り振ります（端数は3人組になります）。';
+}
+function applyGrouping(){
+  const method=document.getElementById('groupMethod').value;
+  if(method==='manual'){
+    const updates={ groupMode:'manual', groups:null };
+    listNums().forEach(n=>{ updates['students/'+n+'/group']=null; updates['students/'+n+'/pguess']=null; });
+    ref.update(updates);
+    alert('手動グループにしました。児童が相手の番号を入力して組みます。');
+  } else {
+    autoAssign(method); // 'random' or 'order'
+    ref.child('groupMode').set(method);
+  }
+}
+function autoAssign(method){
+  const size=parseInt(document.getElementById('groupSize').value,10)||2;
+  let nums=listNums();
+  if(nums.length===0){ alert('まだ誰も参加していません'); return; }
+  if(method==='random'){
+    for(let i=nums.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [nums[i],nums[j]]=[nums[j],nums[i]]; }
+  }
+  const groups=[]; for(let i=0;i<nums.length;i+=size) groups.push(nums.slice(i,i+size));
+  if(groups.length>=2 && groups[groups.length-1].length===1){
+    groups[groups.length-2]=groups[groups.length-2].concat(groups.pop());
+  }
+  const updates={ groups:null };
+  groups.forEach((mem,gi)=>{ mem.forEach(n=>{ updates['students/'+n+'/group']=gi+1; }); });
+  listNums().forEach(n=>{ if(!groups.some(m=>m.includes(n))) updates['students/'+n+'/group']=null; });
+  listNums().forEach(n=>{ updates['students/'+n+'/pguess']=null; });
+  ref.update(updates);
+  alert(groups.length+'グループに分けました。');
+}
+function clearGroups(){
+  const updates={ groups:null };
+  listNums().forEach(n=>{ updates['students/'+n+'/group']=null; updates['students/'+n+'/pguess']=null; });
+  ref.update(updates);
+}
 
 function endClass(){
-  if(!confirm('このクラスを終了します。\n児童はホーム画面にもどり、クラスのデータは削除されます。\nよろしいですか？')) return;
+  if(!confirm('このルームを終了します。\n児童はホーム画面にもどり、ルーム番号（データ）は削除されます。\nよろしいですか？')) return;
   document.getElementById('phaseTag').textContent='終了処理中…';
   // まず児童に終了を通知 → 少し待ってからデータ削除 → 自分もホームへ
   ref.update({ phase:'ended' }).then(()=>{
@@ -260,6 +397,7 @@ function revealResults(){
   const winner = ranking.length? ranking[0] : null;
   ref.update({ phase:'result', result:{ explainer:ex, round:r, target, ranking, winner } });
 }
+onMethodChange();
 </script>
 </body>
 </html>
