@@ -33,40 +33,40 @@
     <img class="hero" src="assets/bg.png" alt="お部屋">
 
     <div id="rolePick" class="choice">
-      <button onclick="pick('teacher')"><span class="ic">🧑‍🏫</span>先生<br><span class="muted" style="font-size:.8rem;font-weight:700">ルーム発行・進行</span></button>
-      <button onclick="pick('student')"><span class="ic">🧒</span>児童<br><span class="muted" style="font-size:.8rem;font-weight:700">ルーム番号で参加</span></button>
+      <button onclick="pick('teacher')"><span class="ic">🧑‍🏫</span>Teacher<br><span class="muted" style="font-size:.8rem;font-weight:700">先生（ルーム発行・進行）</span></button>
+      <button onclick="pick('student')"><span class="ic">🧒</span>Student<br><span class="muted" style="font-size:.8rem;font-weight:700">児童（Room No. で参加）</span></button>
     </div>
 
     <!-- 先生 -->
     <div id="teacherForm" class="form">
       <!-- ログイン -->
       <div id="loginBox">
-        <label>メールアドレス</label>
+        <label>Email <span class="muted">メールアドレス</span></label>
         <input id="tEmail" type="email" autocomplete="username" placeholder="teacher@example.com">
-        <label>パスワード</label>
+        <label>Password <span class="muted">パスワード</span></label>
         <input id="tPass" type="password" autocomplete="current-password" placeholder="パスワード">
-        <button class="btn full big" style="margin-top:14px" onclick="teacherLogin()">ログイン ▶</button>
+        <button class="btn full big" style="margin-top:14px" onclick="teacherLogin()">Log in ▶</button>
         <div id="loginMsg" class="muted" style="margin-top:10px;font-size:.85rem"></div>
       </div>
       <!-- ログイン後：ルーム発行 -->
       <div id="issueBox" style="display:none">
         <div class="muted" style="font-size:.85rem">ログイン中：<b id="who"></b></div>
-        <button class="btn full big" style="margin-top:12px" onclick="issueRoom()">ルームを発行 ▶</button>
+        <button class="btn full big" style="margin-top:12px" onclick="issueRoom()">Create Room ▶</button>
         <div class="muted" style="font-size:.8rem;margin-top:8px">発行後、先生画面で「クラス全体／ペア・グループ」を切り替えられます。</div>
-        <button class="btn ghost full" style="margin-top:8px" onclick="teacherLogout()">ログアウト</button>
+        <button class="btn ghost full" style="margin-top:8px" onclick="teacherLogout()">Log out</button>
         <div id="issueMsg" class="muted" style="margin-top:10px;font-size:.85rem"></div>
       </div>
-      <button class="btn ghost full" style="margin-top:8px" onclick="reset()">もどる</button>
+      <button class="btn ghost full" style="margin-top:8px" onclick="reset()">Back</button>
     </div>
 
     <!-- 児童 -->
     <div id="studentForm" class="form">
-      <label>ルーム番号</label>
+      <label>Room No. <span class="muted">ルーム番号</span></label>
       <input id="sCode" type="number" inputmode="numeric" placeholder="1234">
-      <label>出席番号</label>
+      <label>Your No. <span class="muted">出席番号</span></label>
       <input id="sNum" type="number" inputmode="numeric" min="1" max="99" placeholder="12">
-      <button class="btn full big" style="margin-top:16px" onclick="goStudent()">さんかする ▶</button>
-      <button class="btn ghost full" style="margin-top:8px" onclick="reset()">もどる</button>
+      <button class="btn full big" style="margin-top:16px" onclick="goStudent()">Join ▶</button>
+      <button class="btn ghost full" style="margin-top:8px" onclick="reset()">Back</button>
     </div>
 
     <div id="warn" class="warn">⚠️ Firebase が未設定です。<code>firebase-config.js</code> にあなたのプロジェクトの値を入力してください（READMEを参照）。</div>
@@ -154,6 +154,12 @@
     }catch(e){ alert('確認に失敗しました: '+e.message); return; }
     location.href='student.html?code='+encodeURIComponent(c)+'&n='+n;
   }
+
+  // QRコードから来たとき（?room=1234）はルーム番号を自動入力
+  (function(){
+    const rp=new URLSearchParams(location.search).get('room');
+    if(rp){ pick('student'); const f=document.getElementById('sCode'); if(f) f.value=rp; }
+  })();
 </script>
 </body>
 </html>

@@ -42,7 +42,7 @@
 <body>
 <div class="top">
   <span class="me" id="meLabel">―</span>
-  <button class="btn ghost" id="changeNumBtn" style="padding:.2em .8em;font-size:.8rem;display:none" onclick="changeNumber()">✎ 番号変更</button>
+  <button class="btn ghost" id="changeNumBtn" style="padding:.2em .8em;font-size:.8rem;display:none" onclick="changeNumber()">✎ Change No.</button>
   <span class="tag" id="phaseTag">接続中…</span>
   <span class="tag" id="groupTag" style="display:none"></span>
   <span class="tag dot off" id="connTag" style="margin-left:auto">未接続</span>
@@ -60,7 +60,7 @@
     <div class="em">🚪</div>
     <div style="font-weight:700">そのルーム番号は見つかりません</div>
     <div class="muted" style="font-size:.9rem">先生にルーム番号を確認してね。</div>
-    <button class="btn" onclick="location.replace('index.html')">ホームにもどる</button>
+    <button class="btn" onclick="location.replace('index.html')">Home</button>
   </div>
 
   <!-- 出席番号が使用中 -->
@@ -70,8 +70,8 @@
     <div class="muted" style="font-size:.9rem">べつの出席番号を入力してね。</div>
     <input id="newNumInput" type="number" inputmode="numeric" min="1" max="99" placeholder="13"
       style="font-family:inherit;font-size:1.3rem;width:160px;text-align:center;padding:.5em;border:2px solid var(--line);border-radius:12px">
-    <button class="btn" onclick="retryNumber()">この番号で入る ▶</button>
-    <button class="btn ghost" onclick="location.replace('index.html')">ホームにもどる</button>
+    <button class="btn" onclick="retryNumber()">Join ▶</button>
+    <button class="btn ghost" onclick="location.replace('index.html')">Home</button>
   </div>
 
   <!-- グループ番号入力（手動：児童が相手を選ぶ） -->
@@ -81,17 +81,17 @@
     <div class="muted" style="font-size:.85rem;max-width:360px;text-align:center">ペア・グループの中で<b>いちばん小さい出席番号</b>を、全員で同じように入力してね（例：12番と13番なら「12」）</div>
     <input id="groupInput" type="number" inputmode="numeric" min="1" max="99" placeholder="12"
       style="font-family:inherit;font-size:1.3rem;width:160px;text-align:center;padding:.5em;border:2px solid var(--line);border-radius:12px">
-    <button class="btn" onclick="setGroup()">けってい ▶</button>
+    <button class="btn" onclick="setGroup()">OK ▶</button>
   </div>
 
   <!-- 配置エディタ（配置タイム／予想タイム共用） -->
   <div id="editBox" class="hidden">
     <div class="banner" id="editBanner"></div>
-    <div class="fs-bar"><button class="btn ghost" id="fsBtn" onclick="toggleExpand()">⛶ 大きく表示</button></div>
+    <div class="fs-bar"><button class="btn ghost" id="fsBtn" onclick="toggleExpand()">⛶ Zoom</button></div>
     <div class="submitted-veil">
       <div id="editorScene"></div>
       <div class="veil hidden" id="editVeil"><div class="em">✅</div><div id="veilMsg">提出しました！</div>
-        <button class="btn ghost" id="reeditBtn">やり直す</button>
+        <button class="btn ghost" id="reeditBtn">Redo</button>
         <button class="btn hidden" id="veilNext" onclick="pairNext()">つぎの人へ ▶</button>
       </div>
     </div>
@@ -106,7 +106,8 @@
     <div id="ownScene"></div>
     <div id="pairExtra" class="hidden">
       <div id="pairMatches" class="muted" style="text-align:center;margin-top:10px"></div>
-      <button class="btn full big" style="margin-top:10px" onclick="pairNext()">つぎの人へ ▶（交代）</button>
+      <button class="btn full big" id="pairRevealBtn" style="margin-top:10px" onclick="pairReveal()">こたえあわせ ▶（Check answers）</button>
+      <button class="btn full big sage hidden" id="pairNextBtn2" style="margin-top:10px" onclick="pairNext()">つぎの人へ ▶（Next）</button>
     </div>
     <div class="tip">例: The ball is on the table. / The lamp is under the table.</div>
   </div>
@@ -125,8 +126,9 @@
       </div>
     </div>
     <div class="scorebox" id="myScoreBox"></div>
-    <div style="text-align:center;font-weight:700;margin-top:14px" class="muted">いちばん近かった3人</div>
+    <div id="topLabel" style="text-align:center;font-weight:700;margin-top:14px" class="muted">いちばん近かった3人</div>
     <div id="topBox" style="margin-top:6px"></div>
+    <button class="btn full big sage hidden" id="pairNextResult" style="margin-top:12px" onclick="pairNext()">つぎの人へ ▶（Next）</button>
   </div>
 </div>
 
@@ -139,7 +141,7 @@
 const params=new URLSearchParams(location.search);
 const CODE=(params.get('code')||'').toUpperCase();
 const N=parseInt(params.get('n'),10);
-document.getElementById('meLabel').textContent='出席番号 '+N;
+document.getElementById('meLabel').textContent='No. '+N;
 
 // この端末を識別するID（同じ番号の二重登録を防ぐ／再読込時は自分と判定）
 function getClientId(){
@@ -182,7 +184,7 @@ function fitEditor(){
 function toggleExpand(){
   editBox.classList.toggle('fs');
   const on=editBox.classList.contains('fs');
-  document.getElementById('fsBtn').textContent = on ? '✕ とじる' : '⛶ 大きく表示';
+  document.getElementById('fsBtn').textContent = on ? '✕ Close' : '⛶ Zoom';
   fitEditor();
 }
 
@@ -257,7 +259,7 @@ function changeNumber(){
   });
 }
 
-const PHASE_JA={lobby:'説明',build:'配置タイム',guess:'予想タイム',result:'結果',pair:'ペア活動'};
+const PHASE_JA={lobby:'Waiting',build:'Build',guess:'Guess',result:'Result',pair:'Pair'};
 function me(){ return (session.students&&session.students[N])||{}; }
 function mode(){ return session.mode||'class'; }
 function groupModeOf(){ return session.groupMode||'random'; }
@@ -278,7 +280,7 @@ function show(id){
   });
   if(id!=='editBox' && editBox.classList.contains('fs')){
     editBox.classList.remove('fs');
-    document.getElementById('fsBtn').textContent='⛶ 大きく表示';
+    document.getElementById('fsBtn').textContent='⛶ Zoom';
     document.getElementById('editorScene').style.width='';
   }
 }
@@ -288,7 +290,7 @@ function render(){
   if(phase==='ended'){ location.replace('index.html'); return; }
   document.getElementById('phaseTag').textContent=PHASE_JA[phase]||phase;
   const gt=document.getElementById('groupTag');
-  if(mode()==='pair' && me().group!=null){ gt.style.display=''; gt.textContent='グループ'+me().group; }
+  if(mode()==='pair' && me().group!=null){ gt.style.display=''; gt.textContent='Group '+me().group; }
   else { gt.style.display='none'; }
   editorScene.setAllowResize(!!session.allowResize);
 
@@ -325,10 +327,10 @@ function changeGroup(){ meRef.child('group').set(null); }
 function renderBuild(){
   show('editBox');
   document.getElementById('editBanner').className='banner build';
-  let banner='✏️ じぶんのお部屋を作ろう → できたら「提出」';
+  let banner='✏️ じぶんのお部屋を作ろう → できたら「Submit」';
   if(mode()==='pair' && me().group!=null){
     const mem=groupAll(me().group).join('・');
-    banner+=`<div style="font-weight:700;margin-top:6px;font-size:.95rem">👥 グループ${me().group}（${mem}）`;
+    banner+=`<div style="font-weight:700;margin-top:6px;font-size:.95rem">👥 Group ${me().group}（${mem}）`;
     if(groupModeOf()==='manual') banner+=` <button class="btn ghost" style="padding:.2em .8em;font-size:.8rem" onclick="changeGroup()">変更</button>`;
     banner+='</div>';
   }
@@ -344,8 +346,8 @@ function renderBuild(){
   document.getElementById('reeditBtn').onclick=()=>{ meRef.child('buildSubmitted').set(false); };
   // ボタン
   const a=document.getElementById('editActions'); a.innerHTML='';
-  a.appendChild(mkBtn('📷 画像で保存','ghost',()=>exportSceneImage(document.getElementById('editorScene'),'my-room-'+N+'.png')));
-  a.appendChild(mkBtn('提出する ▶','big',submitBuild));
+  a.appendChild(mkBtn('📷 Save','ghost',()=>exportSceneImage(document.getElementById('editorScene'),'my-room-'+N+'.png')));
+  a.appendChild(mkBtn('Submit ▶','big',submitBuild));
   fitEditor();
 }
 function submitBuild(){
@@ -358,7 +360,7 @@ function submitBuild(){
 function renderGuess(){
   show('editBox');
   document.getElementById('editBanner').className='banner guess';
-  document.getElementById('editBanner').innerHTML='👂 説明を聞いて、お部屋を予想して配置 → 「提出」';
+  document.getElementById('editBanner').innerHTML='👂 説明を聞いて、お部屋を予想して配置 → 「Submit」';
   if(guessRound!==session.round){
     editorScene.setState({});
     palette.refresh();
@@ -370,7 +372,7 @@ function renderGuess(){
   document.getElementById('veilMsg').textContent='提出しました！ 結果をまってね';
   document.getElementById('reeditBtn').onclick=()=>{ meRef.child('guess/submitted').set(false); };
   const a=document.getElementById('editActions'); a.innerHTML='';
-  a.appendChild(mkBtn('提出する ▶','big sage',submitGuess));
+  a.appendChild(mkBtn('Submit ▶','big sage',submitGuess));
   fitEditor();
 }
 function submitGuess(){
@@ -410,44 +412,80 @@ function renderPairDescriber(g,grp){
   ownScene.setState(me().build||{});
   setTimeout(()=>ownScene.relayout(),50);
   document.getElementById('pairExtra').classList.remove('hidden');
-  // メンバーの一致率
   const others=groupMembers(g).filter(n=>n!==N);
   const st=session.students||{};
-  const html=others.map(n=>{
-    const pg=st[n].pguess;
-    if(pg&&pg.submitted&&pg.round===grp.round){
-      const rate=scoreGuess(me().build||{}, pg.objects||{});
-      return `${n}番：<b style="color:var(--sage-d)">一致率 ${rate}%</b>`;
-    }
-    return `${n}番：予想中…`;
-  }).join(' ／ ');
-  document.getElementById('pairMatches').innerHTML = others.length? html : 'グループに予想する人がいません';
+  const revealed=!!grp.revealed;
+  const submittedCount=others.filter(n=>{ const p=st[n].pguess; return p&&p.submitted&&p.round===grp.round; }).length;
+  if(!revealed){
+    // 答え合わせ前は人数だけ（誰にも答えはまだ見せない）
+    document.getElementById('pairMatches').innerHTML = others.length
+      ? `ていしゅつ：${submittedCount} / ${others.length} 人`
+      : 'グループに予想する人がいません';
+    document.getElementById('pairRevealBtn').classList.remove('hidden');
+    document.getElementById('pairRevealBtn').disabled = submittedCount===0;
+    document.getElementById('pairNextBtn2').classList.add('hidden');
+  } else {
+    // 答え合わせ後は全員の一致率
+    const html=others.map(n=>{
+      const pg=st[n].pguess;
+      if(pg&&pg.submitted&&pg.round===grp.round){
+        const rate=scoreGuess(me().build||{}, pg.objects||{});
+        return `${n}番：<b style="color:var(--sage-d)">一致率 ${rate}%</b>`;
+      }
+      return `${n}番：みていない`;
+    }).join(' ／ ');
+    document.getElementById('pairMatches').innerHTML = others.length? html : 'グループに予想する人がいません';
+    document.getElementById('pairRevealBtn').classList.add('hidden');
+    document.getElementById('pairNextBtn2').classList.remove('hidden');
+  }
 }
 function renderPairGuesser(g,grp){
-  show('editBox');
-  document.getElementById('editBanner').className='banner guess';
-  document.getElementById('editBanner').innerHTML='👂 '+grp.describer+'番の説明を聞いて、予想して配置 → 「提出」';
-  if(pairRound!==grp.round){ editorScene.setState({}); palette.refresh(); pairRound=grp.round; }
   const pg=me().pguess;
   const submitted=pg&&pg.submitted&&pg.round===grp.round;
+  const revealed=!!grp.revealed;
+
+  if(submitted && revealed){
+    // 答え合わせ：自分の予想と正解をくらべる（一致率）
+    show('resultBox');
+    document.querySelector('#resultBox .banner').innerHTML='🎉 こたえあわせ — あなたの予想とせいかい';
+    const desc=(session.students&&session.students[grp.describer])||{};
+    answerScene.setState(desc.build||{});
+    myGuessScene.setState(pg.objects||{});
+    setTimeout(()=>{ answerScene.relayout(); myGuessScene.relayout(); },50);
+    document.getElementById('guessCol').style.display='';
+    document.getElementById('compareWrap').style.gridTemplateColumns='';
+    document.getElementById('answerLabel').textContent='⭕ せいかい';
+    const rate=scoreGuess(desc.build||{}, pg.objects||{});
+    document.getElementById('myScoreBox').innerHTML='一致率 <span class="big-num">'+rate+'</span>％';
+    document.getElementById('topLabel').style.display='none';
+    document.getElementById('topBox').style.display='none';
+    document.getElementById('pairNextResult').classList.remove('hidden');
+    return;
+  }
+
+  // まだ答え合わせ前：エディタで予想・提出
+  show('editBox');
+  document.getElementById('editBanner').className='banner guess';
+  document.getElementById('editBanner').innerHTML='👂 '+grp.describer+'番の説明を聞いて、予想して配置 → 「Submit」';
+  if(pairRound!==grp.round){ editorScene.setState({}); palette.refresh(); pairRound=grp.round; }
   const veil=document.getElementById('editVeil');
   veil.classList.toggle('hidden', !submitted);
   if(submitted){
-    const desc=(session.students&&session.students[grp.describer])||{};
-    const rate=scoreGuess(desc.build||{}, pg.objects||{});
-    document.getElementById('veilMsg').innerHTML='一致率 <span class="big-num" style="font-size:2rem">'+rate+'</span>％ ✅';
-    document.getElementById('veilNext').classList.remove('hidden');
-  } else {
+    // 提出済みだが、出題者の「こたえあわせ」待ち（答えはまだ見せない）
+    document.getElementById('veilMsg').innerHTML='ていしゅつしました！<br><span class="muted">こたえあわせを待ってね（Wait for the check）</span>';
     document.getElementById('veilNext').classList.add('hidden');
   }
   document.getElementById('reeditBtn').onclick=()=>{ meRef.child('pguess/submitted').set(false); };
   const a=document.getElementById('editActions'); a.innerHTML='';
-  a.appendChild(mkBtn('提出する ▶','big sage',submitPair));
+  a.appendChild(mkBtn('Submit ▶','big sage',submitPair));
   fitEditor();
 }
 function submitPair(){
   const g=me().group; const grp=(session.groups&&session.groups[g])||{round:1};
   meRef.child('pguess').set({ round:grp.round, objects:editorScene.getState(), submitted:true });
+}
+function pairReveal(){
+  const g=me().group; ref.child('groups/'+g+'/revealed').set(true);
 }
 function pairNext(){
   const g=me().group; const grp=(session.groups&&session.groups[g]); if(!grp) return;
@@ -457,6 +495,7 @@ function pairNext(){
   const updates={};
   updates['groups/'+g+'/describer']=nextD;
   updates['groups/'+g+'/round']=(grp.round||1)+1;
+  updates['groups/'+g+'/revealed']=false;
   members.forEach(n=>{ updates['students/'+n+'/pguess']=null; });
   ref.update(updates);
 }
@@ -466,6 +505,12 @@ function renderResult(){
   show('resultBox');
   const res=session.result||{};
   const isExplainer = res.explainer===N;
+
+  // クラスモードの表示に戻す（ペア用の要素をリセット）
+  document.querySelector('#resultBox .banner').innerHTML='🎉 けっか — あなたの予想とせいかいをくらべよう';
+  document.getElementById('topLabel').style.display='';
+  document.getElementById('topBox').style.display='';
+  document.getElementById('pairNextResult').classList.add('hidden');
 
   // せいかい（出題者の部屋）
   answerScene.setState(res.target||{});
