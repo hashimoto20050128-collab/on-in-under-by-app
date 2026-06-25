@@ -31,7 +31,8 @@
   .step-hint{font-size:.8rem;color:var(--ink-soft);margin-top:6px}
   #resultScene{width:100%;max-width:760px}
   /* 説明アニメ */
-  #explainerWrap{max-width:680px;margin:0 auto}
+  #explainerWrap{width:100%;max-width:680px;margin:0 auto}
+  #s-lobby{width:100%}
   #explainerWrap.fs{position:fixed;inset:0;z-index:70;max-width:none;background:var(--cream);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:14px;gap:6px}
   .exp-topbar{display:flex;justify-content:flex-end;width:100%;max-width:680px}
   #explainerWrap.fs .exp-stage{max-width:min(96vw, calc((100vh - 230px) * 1.78))}
@@ -54,23 +55,24 @@
   .exp-bubble.show{opacity:1;transform:translateX(-50%) scale(1)}
   .exp-podium-overlay{position:absolute;inset:0;z-index:7;display:none;flex-direction:column;align-items:center;justify-content:center;gap:8px;background:rgba(251,241,221,.82)}
   .exp-podium-overlay.show{display:flex}
-  /* ②：2画面（説明する人 / 聞いて予想する人） */
-  .exp-duo{position:absolute;inset:0;z-index:8;display:none;align-items:center;justify-content:center;gap:3%;background:var(--cream);padding:2% 3%}
-  .exp-duo.show{display:flex}
-  .exp-device{display:flex;flex-direction:column;align-items:center;gap:6px;width:42%}
-  .dev-label{font-weight:800;font-size:.82rem;text-align:center;line-height:1.15}
-  .dev-label span{font-weight:700;font-size:.7rem;color:var(--ink-soft)}
-  .dev-label.spk{color:var(--peach-d)} .dev-label.lis{color:var(--sage-d)}
-  .dev-screen{position:relative;width:100%;aspect-ratio:1918/1077;border-radius:10px;overflow:hidden;border:4px solid #fff;box-shadow:var(--shadow);background:#fff}
-  .dev-screen .exp-bg{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:1}
-  .dev-obj{position:absolute;z-index:2;transform:translate(-50%,-50%);opacity:0;transition:left .7s cubic-bezier(.2,.8,.2,1),top .7s cubic-bezier(.2,.8,.2,1),opacity .4s ease}
+  /* ②：2画面（説明する人 / 聞いて予想する人）— 枠サイズはステージと同一、部屋を大きく */
+  .exp-duo{position:absolute;inset:0;z-index:8;display:none;background:var(--cream)}
+  .exp-duo.show{display:block}
+  .dev{position:absolute;top:52%;transform:translateY(-50%);width:47%}
+  .dev.A{left:1.5%} .dev.B{right:1.5%}
+  .dev .lbl{text-align:center;font-weight:800;font-size:.85rem;line-height:1.15;margin-bottom:7px}
+  .dev .lbl span{display:block;font-weight:700;font-size:.68rem;color:var(--ink-soft)}
+  .dev.A .lbl{color:var(--peach-d)} .dev.B .lbl{color:var(--sage-d)}
+  .dev .room{position:relative;width:100%;aspect-ratio:1918/1077;border-radius:12px;overflow:hidden;box-shadow:var(--shadow)}
+  .dev .room>.exp-bg{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:1}
+  .dev-obj{position:absolute;z-index:2;transform:translate(-50%,-50%);opacity:0;transition:left .7s cubic-bezier(.2,.8,.2,1),top .7s cubic-bezier(.2,.8,.2,1),opacity .35s ease}
   .dev-obj.show{opacity:1}
   .dev-obj img{width:100%;height:auto;display:block;filter:drop-shadow(0 2px 3px rgba(80,55,30,.22))}
-  .dev-bubble{position:absolute;left:60%;top:10%;transform:translateX(-50%);z-index:5;background:#fff;border:2px solid var(--line);border-radius:12px;padding:4px 9px;font-family:"Baloo 2",sans-serif;font-weight:700;font-size:.64rem;white-space:nowrap;box-shadow:var(--shadow);opacity:0;transition:opacity .4s ease}
+  .dev-bubble{position:absolute;left:60%;top:9%;transform:translateX(-50%);z-index:5;background:#fff;border:2px solid var(--line);border-radius:12px;padding:4px 9px;font-family:"Baloo 2",sans-serif;font-weight:700;font-size:.66rem;white-space:nowrap;box-shadow:var(--shadow);opacity:0;transition:opacity .4s ease}
   .dev-bubble.show{opacity:1}
-  .exp-flow{display:flex;flex-direction:column;align-items:center;color:var(--sage-d);font-weight:800;flex:0 0 auto}
-  .exp-flow-arrow{font-size:1.8rem;animation:flowpulse 1.2s ease-in-out infinite}
-  .exp-flow-cap{font-size:.72rem;text-align:center;line-height:1.1}
+  .exp-flow{position:absolute;left:50%;top:52%;transform:translate(-50%,-50%);z-index:9;text-align:center;color:var(--sage-d);font-weight:800}
+  .exp-flow-arrow{font-size:1.3rem;animation:flowpulse 1.2s ease-in-out infinite}
+  .exp-flow-cap{font-size:.66rem;text-align:center;line-height:1.1}
   @keyframes flowpulse{0%,100%{transform:translateX(0);opacity:.55}50%{transform:translateX(5px);opacity:1}}
   .exp-cap{text-align:center;font-weight:700;margin-top:8px;min-height:2.6em;font-size:1.05rem}
   .exp-nav{display:flex;align-items:center;justify-content:center;gap:18px;margin-top:6px}
@@ -122,14 +124,14 @@
           <div class="exp-bubble" id="expBubble"></div>
           <div class="exp-podium-overlay" id="expPodium"></div>
           <div class="exp-duo" id="expDuo">
-            <div class="exp-device">
-              <div class="dev-label spk">🗣️ せつめいする人<br><span>Describer</span></div>
-              <div class="dev-screen" id="devA"><img class="exp-bg" src="assets/bg.png" alt=""><div class="dev-bubble" id="devBubble">The ball is on the table.</div></div>
+            <div class="dev A">
+              <div class="lbl">🗣️ せつめいする人<span>Describer</span></div>
+              <div class="room" id="devA"><img class="exp-bg" src="assets/bg.png" alt=""><div class="dev-bubble" id="devBubble">The ball is on the table.</div></div>
             </div>
             <div class="exp-flow"><div class="exp-flow-arrow">➡</div><div class="exp-flow-cap">きいて<br>よそう</div></div>
-            <div class="exp-device">
-              <div class="dev-label lis">👂 きいて予想する人<br><span>Listen &amp; Guess</span></div>
-              <div class="dev-screen" id="devB"><img class="exp-bg" src="assets/bg.png" alt=""></div>
+            <div class="dev B">
+              <div class="lbl">👂 きいて予想する人<span>Listen &amp; Guess</span></div>
+              <div class="room" id="devB"><img class="exp-bg" src="assets/bg.png" alt=""></div>
             </div>
           </div>
         </div>
@@ -339,29 +341,34 @@ function expApply(){
   }
 }
 function runStep2(tok){
-  const db=document.getElementById('devBubble');
-  Object.values(DEVA).forEach(e=>e.classList.remove('show'));
-  DEVB.ball.classList.remove('show'); db.classList.remove('show');
-  const dropBall=()=>{ const b=DEVB.ball; b.style.transition='none'; b.style.left='66%'; b.style.top='-10%'; void b.offsetWidth; b.style.transition=''; b.classList.add('show');
-    setTimeout(()=>{ if(tok===expToken){ b.style.left='66%'; b.style.top='66%'; } },60); };
-  after(tok,150,()=>{ Object.values(DEVA).forEach(e=>e.classList.add('show')); }); // 出題者：自分の部屋
-  after(tok,650,()=>{ db.classList.add('show'); });                               // 英語で説明（吹き出し）
-  after(tok,1500,dropBall);                                                       // 聞いた人が予想して配置
-  const iv=setInterval(()=>{ if(tok!==expToken){ clearInterval(iv); return; }     // くりかえし再生
-    const b=DEVB.ball; b.style.transition='none'; b.style.opacity='0'; void b.offsetWidth; b.style.transition='';
-    setTimeout(()=>{ if(tok===expToken) dropBall(); }, 500);
-  }, 3200);
+  const db=document.getElementById('devBubble'); const ball=DEVB.ball;
+  Object.values(DEVA).forEach(e=>e.classList.add('show'));   // 出題者：自分の部屋（全部）
+  db.classList.remove('show'); ball.classList.remove('show');
+  const drop=()=>{ if(tok!==expToken) return;
+    ball.style.transition='none'; ball.style.left='66%'; ball.style.top='-12%'; ball.style.opacity='0'; void ball.offsetWidth;
+    ball.style.transition=''; ball.classList.add('show'); ball.style.opacity='1';
+    requestAnimationFrame(()=>{ if(tok===expToken){ ball.style.left='66%'; ball.style.top='66%'; } });
+  };
+  after(tok,500,()=>{ db.classList.add('show'); });   // 英語で説明（吹き出し）
+  after(tok,1300,drop);                               // 聞いて → ボールを机の上へ（置いたら残る）
+  const iv=setInterval(()=>{ if(tok!==expToken){ clearInterval(iv); return; } drop(); }, 3600); // ときどき再生
 }
 function runStep1(tok){
-  ptr(50,62);
-  after(tok,200,()=>{ expPointer.classList.add('show'); });
-  [['ball',250],['clock',1450],['lamp',2650],['book',3850]].forEach(([id,t])=>{
-    after(tok,t,      ()=>{ ptrToBtn(id); });
-    after(tok,t+600,  ()=>{ press(id); const c=pctCenter(expBtn[id]); objStartAt(id,c.xp,c.yp); });
-    after(tok,t+900,  ()=>{ objMove(id); ptrToObj(id); });
-  });
-  after(tok,5000,()=>{ expPointer.classList.remove('show'); });
-  after(tok,5300,()=>{ document.getElementById('expTray').classList.remove('show'); });
+  const play=()=>{
+    if(tok!==expToken) return;
+    document.getElementById('expTray').classList.add('show');
+    EXP_OBJS.forEach(o=>objHide(o.id));
+    ptr(50,62);
+    after(tok,200,()=>{ expPointer.classList.add('show'); });
+    [['ball',250],['clock',1450],['lamp',2650],['book',3850]].forEach(([id,t])=>{
+      after(tok,t,      ()=>{ ptrToBtn(id); });
+      after(tok,t+600,  ()=>{ press(id); const c=pctCenter(expBtn[id]); objStartAt(id,c.xp,c.yp); });
+      after(tok,t+900,  ()=>{ objMove(id); ptrToObj(id); });
+    });
+    after(tok,5000,()=>{ expPointer.classList.remove('show'); });
+    after(tok,6600,play);   // ループ再生
+  };
+  play();
 }
 function expNext(){ if(expStep<2){ expStep++; expApply(); } }
 function expPrev(){ if(expStep>0){ expStep--; expApply(); } }
