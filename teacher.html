@@ -37,7 +37,7 @@
   .exp-topbar{display:flex;justify-content:flex-end;width:100%;max-width:680px}
   #explainerWrap.fs .exp-stage{max-width:min(96vw, calc((100vh - 230px) * 1.78))}
   .exp-stage{position:relative;z-index:0;width:100%;max-width:680px;margin:10px auto;aspect-ratio:1918/1077;border-radius:14px;overflow:hidden;box-shadow:var(--shadow)}
-  .exp-stage.bare{box-shadow:none;background:transparent;overflow:visible}
+  .exp-stage.bare{box-shadow:none;background:transparent}
   .exp-stage.bare>.exp-bg{display:none}
   .exp-bg{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:1}
   .exp-obj{position:absolute;z-index:3;opacity:0;transform:translate(-50%,-50%) scale(.5);
@@ -55,7 +55,7 @@
   .exp-bubble{position:absolute;left:62%;top:16%;transform:translateX(-50%) scale(.8);z-index:5;opacity:0;transition:all .45s ease;
     background:#fff;border:2px solid var(--line);border-radius:16px;padding:8px 16px;font-family:"Baloo 2",sans-serif;font-weight:700;color:var(--ink);white-space:nowrap;box-shadow:var(--shadow)}
   .exp-bubble.show{opacity:1;transform:translateX(-50%) scale(1)}
-  .exp-podium-overlay{position:absolute;inset:0;z-index:7;display:none;flex-direction:column;align-items:center;justify-content:center;gap:8px;background:transparent}
+  .exp-podium-overlay{position:absolute;inset:0;z-index:7;display:none;flex-direction:column;align-items:center;justify-content:center;gap:8px;background:rgba(45,40,35,.34)}
   .exp-podium-overlay.show{display:flex}
   /* ②：2画面（説明する人 / 聞いて予想する人）— 枠なし・部屋を大きく */
   .exp-duo{position:absolute;inset:0;z-index:8;display:none;background:transparent}
@@ -291,7 +291,7 @@ function expBuild(){
     b.innerHTML='<img src="'+o.img+'" alt="">'; tray.appendChild(b); expBtn[id]=b;
   });
   // 表彰台（サンプル）
-  expPodium.innerHTML='<div style="font-weight:800;color:var(--peach-d);font-size:1.2rem">🏆 1〜3位 はっぴょう</div>'
+  expPodium.innerHTML='<div style="display:inline-block;background:#fff;border-radius:999px;padding:7px 20px;font-weight:800;color:var(--peach-d);font-size:1.25rem;box-shadow:0 6px 16px rgba(80,55,30,.22)">🏆 1〜3位 はっぴょう</div>'
     + topThreeHTML([{n:12,score:98},{n:7,score:91},{n:23,score:84}], true);
   // ②の2画面：説明する人(devA=全部置く) / 聞いて予想する人(devB=ボールが机へ)
   const mkDevObj=o=>{ const d=document.createElement('div'); d.className='dev-obj';
@@ -333,6 +333,7 @@ function expApply(){
     document.getElementById('expCap').textContent='② 選ばれた人が自分の部屋を英語で説明 → ほかの人は聞いて、自分の画面でその部屋を予想して配置';
     document.getElementById('expTray').classList.remove('show');
     expPointer.classList.remove('show');
+    EXP_OBJS.forEach(o=>objHide(o.id));   // ①の物が透けて残らないように消す
     document.getElementById('expDuo').classList.add('show');
     runStep2(tok);
   } else {
