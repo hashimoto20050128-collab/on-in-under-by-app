@@ -139,11 +139,19 @@
     }
   }
 
-  function goStudent(){
+  async function goStudent(){
+    if(!dbReady){ alert('Firebase が未設定です'); return; }
     const c=(document.getElementById('sCode').value||'').trim();
     const n=parseInt(document.getElementById('sNum').value,10);
     if(!c){alert('ルーム番号を入力してください');return;}
     if(!n||n<1){alert('出席番号を入力してください');return;}
+    try{
+      const snap=await db.ref('sessions/'+c).once('value');
+      const s=snap.val();
+      if(!s || !(s.phase||s.mode||s.createdAt) || s.phase==='ended'){
+        alert('そのルーム番号は見つかりません。先生に確認してください。'); return;
+      }
+    }catch(e){ alert('確認に失敗しました: '+e.message); return; }
     location.href='student.html?code='+encodeURIComponent(c)+'&n='+n;
   }
 </script>

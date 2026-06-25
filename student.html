@@ -42,6 +42,7 @@
 <body>
 <div class="top">
   <span class="me" id="meLabel">―</span>
+  <button class="btn ghost" id="changeNumBtn" style="padding:.2em .8em;font-size:.8rem;display:none" onclick="changeNumber()">✎ 番号変更</button>
   <span class="tag" id="phaseTag">接続中…</span>
   <span class="tag" id="groupTag" style="display:none"></span>
   <span class="tag dot off" id="connTag" style="margin-left:auto">未接続</span>
@@ -52,6 +53,25 @@
   <div id="waitBox" class="wait">
     <div class="em">⏳</div>
     <div id="waitMsg" style="font-weight:700">先生の合図をまっています…</div>
+  </div>
+
+  <!-- ルームが存在しない -->
+  <div id="noRoom" class="wait hidden">
+    <div class="em">🚪</div>
+    <div style="font-weight:700">そのルーム番号は見つかりません</div>
+    <div class="muted" style="font-size:.9rem">先生にルーム番号を確認してね。</div>
+    <button class="btn" onclick="location.replace('index.html')">ホームにもどる</button>
+  </div>
+
+  <!-- 出席番号が使用中 -->
+  <div id="numTaken" class="wait hidden">
+    <div class="em">🔢</div>
+    <div style="font-weight:700">この出席番号はもう使われています</div>
+    <div class="muted" style="font-size:.9rem">べつの出席番号を入力してね。</div>
+    <input id="newNumInput" type="number" inputmode="numeric" min="1" max="99" placeholder="13"
+      style="font-family:inherit;font-size:1.3rem;width:160px;text-align:center;padding:.5em;border:2px solid var(--line);border-radius:12px">
+    <button class="btn" onclick="retryNumber()">この番号で入る ▶</button>
+    <button class="btn ghost" onclick="location.replace('index.html')">ホームにもどる</button>
   </div>
 
   <!-- グループ番号入力（手動：児童が相手を選ぶ） -->
@@ -121,13 +141,21 @@ const CODE=(params.get('code')||'').toUpperCase();
 const N=parseInt(params.get('n'),10);
 document.getElementById('meLabel').textContent='出席番号 '+N;
 
+// この端末を識別するID（同じ番号の二重登録を防ぐ／再読込時は自分と判定）
+function getClientId(){
+  for(const get of [()=>localStorage, ()=>sessionStorage]){
+    try{ const s=get(); let id=s.getItem('mrr_cid'); if(!id){ id='c'+Math.random().toString(36).slice(2)+Date.now().toString(36); s.setItem('mrr_cid',id); } if(id) return id; }catch(e){}
+  }
+  return 'c'+Math.random().toString(36).slice(2)+Date.now().toString(36);
+}
+const MY_ID=getClientId();
+
 if(!dbReady){ document.getElementById('phaseTag').textContent='Firebase未設定'; alert('firebase-config.js を設定してください'); }
 const ref = dbReady ? db.ref('sessions/'+CODE) : null;
 const meRef = dbReady ? ref.child('students/'+N) : null;
 let session={};
 
-// 参加登録
-if(meRef){ meRef.child('joinedAt').once('value').then(s=>{ if(!s.exists()) meRef.update({joinedAt:Date.now()}); }); }
+// 参加登録はルーム存在チェック後に行う（存在しないルームに書き込まない）
 
 // シーン
 const editorScene=new Scene(document.getElementById('editorScene'),{editable:true,onChange:onEdit});
@@ -165,12 +193,68 @@ window.addEventListener('resize',()=>{ fitEditor(); ownScene.relayout(); answerS
 let buildLoaded=false, guessRound=-1, pairRound=-1;
 
 if(ref){
-  ref.on('value',snap=>{
-    session=snap.val()||{};
-    document.getElementById('connTag').textContent='接続中';
-    document.getElementById('connTag').className='tag dot';
-    render();
-  },err=>{ document.getElementById('connTag').textContent='接続エラー'; });
+  ref.once('value').then(snap=>{
+    const s=snap.val();
+    if(!s || !(s.phase||s.mode||s.createdAt) || s.phase==='ended'){
+      showNoRoom(); return;
+    }
+    // 出席番号を“予約”する（同じ番号が既に他の端末で使われていたら入れない）
+    meRef.transaction(cur=>{
+      if(cur===null) return { joinedAt:Date.now(), clientId:MY_ID };
+      if(cur.clientId===MY_ID) return cur;   // 自分（再読込・再入室）
+      return;                                // 他の端末が使用中 → 予約を中止
+    }, (err, committed)=>{
+      if(err){ document.getElementById('connTag').textContent='接続エラー'; return; }
+      if(!committed){ showNumTaken(); return; }
+      // 状態の購読を開始
+      ref.on('value',snap2=>{
+        session=snap2.val()||{};
+        document.getElementById('connTag').textContent='接続中';
+        document.getElementById('connTag').className='tag dot';
+        document.getElementById('changeNumBtn').style.display='';
+        render();
+      },e=>{ document.getElementById('connTag').textContent='接続エラー'; });
+    });
+  }).catch(()=>{ document.getElementById('connTag').textContent='接続エラー'; });
+}
+function showNoRoom(){
+  ['waitBox','groupGate','editBox','explainBox','resultBox','numTaken'].forEach(b=>document.getElementById(b).classList.add('hidden'));
+  document.getElementById('noRoom').classList.remove('hidden');
+  document.getElementById('phaseTag').textContent='ルームなし';
+}
+function showNumTaken(){
+  ['waitBox','groupGate','editBox','explainBox','resultBox','noRoom'].forEach(b=>document.getElementById(b).classList.add('hidden'));
+  document.getElementById('numTaken').classList.remove('hidden');
+  document.getElementById('phaseTag').textContent='番号 使用中';
+}
+function retryNumber(){
+  const m=parseInt(document.getElementById('newNumInput').value,10);
+  if(!m||m<1){ alert('出席番号を入力してください'); return; }
+  location.replace('student.html?code='+encodeURIComponent(CODE)+'&n='+m);
+}
+// 入室後に、空いている番号へ変更する（データも引っ越し）
+function changeNumber(){
+  const v=prompt('新しい出席番号を入力してください', String(N));
+  const m=parseInt(v,10);
+  if(!m||m<1) return;
+  if(m===N) return;
+  const tgt=ref.child('students/'+m);
+  tgt.transaction(cur=>{
+    if(cur===null) return { joinedAt:Date.now(), clientId:MY_ID };
+    if(cur.clientId===MY_ID) return cur;
+    return;                                  // 使用中 → 中止
+  }, (err, committed)=>{
+    if(err){ alert('変更に失敗しました'); return; }
+    if(!committed){ alert(m+'番はもう使われています。'); return; }
+    // 自分のデータを新しい番号へ移して、古い番号を消す
+    meRef.once('value').then(os=>{
+      const old=os.val()||{};
+      old.clientId=MY_ID; old.joinedAt=old.joinedAt||Date.now();
+      tgt.set(old).then(()=> meRef.remove()).then(()=>{
+        location.replace('student.html?code='+encodeURIComponent(CODE)+'&n='+m);
+      });
+    });
+  });
 }
 
 const PHASE_JA={lobby:'説明',build:'配置タイム',guess:'予想タイム',result:'結果',pair:'ペア活動'};

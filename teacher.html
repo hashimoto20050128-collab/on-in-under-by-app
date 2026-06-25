@@ -152,8 +152,7 @@
     <div class="panel">
       <h3>ルーム</h3>
       <button class="btn full" style="background:#C0563F" onclick="endClass()">■ 終了する</button>
-      <div class="step-hint">児童をホーム画面にもどし、このルーム番号（データ）を削除します。</div>
-      <button class="btn ghost full" style="margin-top:10px" onclick="teacherLogout()">ログアウト</button>
+      <div class="step-hint">このルームを終了してログアウトします（児童はホームに戻り、ルーム番号も削除）。</div>
     </div>
   </div>
 </div>
@@ -171,9 +170,9 @@ const URL_MODE = params.get('mode')||'';
 document.getElementById('codeLabel').textContent = 'ルーム '+CODE;
 document.getElementById('joinUrl').textContent = location.host + location.pathname.replace('teacher.html','index.html');
 
-// 認証ガード：未ログインなら入口へ
-if(auth){ auth.onAuthStateChanged(u=>{ if(!u) location.replace('index.html'); }); }
-function teacherLogout(){ if(auth) auth.signOut().then(()=>location.replace('index.html')); else location.replace('index.html'); }
+let loggingOut=false;
+// 認証ガード：未ログインなら入口へ（終了処理中は二重遷移しない）
+if(auth){ auth.onAuthStateChanged(u=>{ if(!u && !loggingOut) location.replace('index.html'); }); }
 
 // ルーム番号の拡大表示（投影用）
 function showRoomBig(){
@@ -377,15 +376,18 @@ function clearGroups(){
   ref.update(updates);
 }
 
-function endClass(){
-  if(!confirm('このルームを終了します。\n児童はホーム画面にもどり、ルーム番号（データ）は削除されます。\nよろしいですか？')) return;
+function endRoom(after){
   document.getElementById('phaseTag').textContent='終了処理中…';
-  // まず児童に終了を通知 → 少し待ってからデータ削除 → 自分もホームへ
+  // 児童に終了を通知 → 少し待ってから（認証が有効なうちに）削除 → 後処理
   ref.update({ phase:'ended' }).then(()=>{
-    setTimeout(()=>{
-      ref.remove().catch(()=>{}).then(()=>{ location.href='index.html'; });
-    }, 2000);
-  }).catch(()=>{ location.href='index.html'; });
+    setTimeout(()=>{ ref.remove().catch(()=>{}).then(()=>{ if(after) after(); }); }, 2000);
+  }).catch(()=>{ if(after) after(); });
+}
+function endClass(){
+  if(!confirm('このルームを終了してログアウトします。\n児童はホーム画面にもどり、ルーム番号（データ）も削除されます。\nよろしいですか？')) return;
+  loggingOut=true;
+  // 認証が有効なうちにルームを削除 → サインアウト → 入口へ
+  endRoom(()=>{ if(auth){ auth.signOut().catch(()=>{}).then(()=>location.replace('index.html')); } else location.replace('index.html'); });
 }
 function toggleResize(){ ref.child('allowResize').set(!session.allowResize); }
 
