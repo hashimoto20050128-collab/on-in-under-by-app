@@ -31,16 +31,29 @@
   .step-hint{font-size:.8rem;color:var(--ink-soft);margin-top:6px}
   #resultScene{width:100%;max-width:760px}
   /* 説明アニメ */
-  .exp-stage{position:relative;width:100%;max-width:680px;margin:12px auto;aspect-ratio:1918/1077;border-radius:14px;overflow:hidden;box-shadow:var(--shadow)}
-  .exp-bg{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
-  .exp-obj{position:absolute;transform:translate(-50%,-50%) scale(.5);opacity:0;transition:opacity .6s ease, transform .7s cubic-bezier(.2,.8,.2,1)}
-  .exp-obj.show{opacity:1;transform:translate(-50%,-50%) scale(1)}
-  .exp-obj img{width:100%;height:100%;object-fit:contain;filter:drop-shadow(0 4px 6px rgba(80,55,30,.22))}
-  .exp-bubble{position:absolute;left:50%;top:15%;transform:translateX(-50%) scale(.8);opacity:0;transition:all .45s ease;background:#fff;border:2px solid var(--line);border-radius:16px;padding:8px 16px;font-family:"Baloo 2",sans-serif;font-weight:700;color:var(--ink);white-space:nowrap;box-shadow:var(--shadow)}
+  #explainerWrap{max-width:680px;margin:0 auto}
+  #explainerWrap.fs{position:fixed;inset:0;z-index:70;max-width:none;background:var(--cream);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:14px;gap:6px}
+  .exp-topbar{display:flex;justify-content:flex-end;width:100%;max-width:680px}
+  #explainerWrap.fs .exp-stage{max-width:min(96vw, calc((100vh - 230px) * 1.78))}
+  .exp-stage{position:relative;width:100%;max-width:680px;margin:10px auto;aspect-ratio:1918/1077;border-radius:14px;overflow:hidden;box-shadow:var(--shadow)}
+  .exp-bg{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:1}
+  .exp-obj{position:absolute;z-index:3;opacity:0;transform:translate(-50%,-50%) scale(.5);
+    transition:left .7s cubic-bezier(.2,.8,.2,1), top .7s cubic-bezier(.2,.8,.2,1), transform .7s cubic-bezier(.2,.8,.2,1), opacity .5s ease}
+  .exp-obj img{width:100%;height:auto;display:block;object-fit:contain;filter:drop-shadow(0 4px 6px rgba(80,55,30,.22))}
+  .exp-tray{position:absolute;left:50%;bottom:3%;transform:translateX(-50%);display:flex;gap:8px;z-index:4;
+    background:rgba(255,255,255,.9);border:1px solid var(--line);border-radius:12px;padding:6px 8px;opacity:0;transition:opacity .4s;box-shadow:var(--shadow)}
+  .exp-tray.show{opacity:1}
+  .exp-tray .titem{width:44px;height:44px;background:#fff;border:2px solid var(--line);border-radius:10px;display:flex;align-items:center;justify-content:center;transition:transform .15s,border-color .15s}
+  .exp-tray .titem.press{transform:scale(.82);border-color:var(--sage)}
+  .exp-tray .titem img{width:78%;height:78%;object-fit:contain}
+  .exp-pointer{position:absolute;left:50%;top:60%;font-size:2rem;z-index:6;opacity:0;pointer-events:none;
+    transition:left .6s ease, top .6s ease, opacity .3s ease;filter:drop-shadow(0 2px 3px rgba(0,0,0,.3))}
+  .exp-pointer.show{opacity:1}
+  .exp-bubble{position:absolute;left:62%;top:16%;transform:translateX(-50%) scale(.8);z-index:5;opacity:0;transition:all .45s ease;
+    background:#fff;border:2px solid var(--line);border-radius:16px;padding:8px 16px;font-family:"Baloo 2",sans-serif;font-weight:700;color:var(--ink);white-space:nowrap;box-shadow:var(--shadow)}
   .exp-bubble.show{opacity:1;transform:translateX(-50%) scale(1)}
-  .exp-badge{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity .45s ease}
-  .exp-badge.show{opacity:1}
-  .exp-badge .chip{background:#fff;border:3px solid var(--gold);border-radius:20px;padding:14px 26px;font-family:"Baloo 2",sans-serif;font-weight:800;font-size:1.6rem;color:var(--peach-d);box-shadow:var(--shadow)}
+  .exp-podium-overlay{position:absolute;inset:0;z-index:7;display:none;flex-direction:column;align-items:center;justify-content:center;gap:8px;background:rgba(251,241,221,.82)}
+  .exp-podium-overlay.show{display:flex}
   .exp-cap{text-align:center;font-weight:700;margin-top:8px;min-height:2.6em;font-size:1.05rem}
   .exp-nav{display:flex;align-items:center;justify-content:center;gap:18px;margin-top:6px}
   /* QR */
@@ -82,16 +95,21 @@
     <!-- lobby -->
     <div id="s-lobby">
       <div class="phase-title">How to Play <span class="muted" style="font-size:1rem">あそびかた</span></div>
-      <div class="exp-stage" id="expStage">
-        <img class="exp-bg" src="assets/bg.png" alt="">
-        <div class="exp-bubble" id="expBubble"></div>
-        <div class="exp-badge" id="expBadge"><div class="chip" id="expChip"></div></div>
-      </div>
-      <div class="exp-cap" id="expCap"></div>
-      <div class="exp-nav">
-        <button class="btn ghost" onclick="expPrev()">◀ Back</button>
-        <span class="muted" id="expProg">1 / 3</span>
-        <button class="btn" onclick="expNext()">Next ▶</button>
+      <div id="explainerWrap">
+        <div class="exp-topbar"><button class="btn ghost" id="expFsBtn" onclick="expToggleFs()">⛶ 全画面</button></div>
+        <div class="exp-stage" id="expStage">
+          <img class="exp-bg" src="assets/bg.png" alt="">
+          <div class="exp-tray" id="expTray"></div>
+          <div class="exp-pointer" id="expPointer">👆</div>
+          <div class="exp-bubble" id="expBubble"></div>
+          <div class="exp-podium-overlay" id="expPodium"></div>
+        </div>
+        <div class="exp-cap" id="expCap"></div>
+        <div class="exp-nav">
+          <button class="btn ghost" onclick="expPrev()">◀ Back</button>
+          <span class="muted" id="expProg">1 / 3</span>
+          <button class="btn" onclick="expNext()">Next ▶</button>
+        </div>
       </div>
     </div>
     <!-- build -->
@@ -218,33 +236,92 @@ const EXP_OBJS=[
   {id:'ball',  img:'assets/ball.png',  w:0.12, x:0.66, y:0.66},
   {id:'book',  img:'assets/book.png',  w:0.15, x:0.66, y:0.86},
 ];
-const EXP_STEPS=[
-  { cap:'① Make your room ｜ じぶんの部屋をつくる', objs:true, bubble:'', badge:'' },
-  { cap:'② Describe & Guess ｜ 英語で説明 → 聞いて予想して配置', objs:true, bubble:'The ball is on the table.', badge:'' },
-  { cap:'③ Check answers ｜ こたえあわせ（一致率や順位が出ます）', objs:true, bubble:'', badge:'🥇 100%' },
-];
-let expStep=0;
+const expStage=document.getElementById('expStage');
+const expPointer=document.getElementById('expPointer');
+const expBubble=document.getElementById('expBubble');
+const expPodium=document.getElementById('expPodium');
+let expStep=0, expToken=0;
+const expNode={}, expBtn={};
+
 function expBuild(){
-  const stage=document.getElementById('expStage');
-  EXP_OBJS.forEach((o,i)=>{
-    const d=document.createElement('div'); d.className='exp-obj'; d.id='expo-'+o.id;
+  EXP_OBJS.forEach(o=>{
+    const d=document.createElement('div'); d.className='exp-obj';
     d.style.width=(o.w*100)+'%'; d.style.left=(o.x*100)+'%'; d.style.top=(o.y*100)+'%';
-    d.style.transitionDelay=(i*0.18)+'s';
     d.innerHTML='<img src="'+o.img+'" alt="">';
-    stage.appendChild(d);
+    expStage.appendChild(d); expNode[o.id]=d;
   });
+  // トレイ（左から ball, clock, lamp, book）
+  const tray=document.getElementById('expTray');
+  ['ball','clock','lamp','book'].forEach(id=>{
+    const o=EXP_OBJS.find(x=>x.id===id);
+    const b=document.createElement('div'); b.className='titem';
+    b.innerHTML='<img src="'+o.img+'" alt="">'; tray.appendChild(b); expBtn[id]=b;
+  });
+  // 表彰台（サンプル）
+  expPodium.innerHTML='<div style="font-weight:800;color:var(--peach-d);font-size:1.2rem">🏆 1〜3位 はっぴょう</div>'
+    + topThreeHTML([{n:12,score:98},{n:7,score:91},{n:23,score:84}], true);
 }
+
+// ---- 部品操作 ----
+function pctCenter(el){ const r=el.getBoundingClientRect(), s=expStage.getBoundingClientRect();
+  return { xp:(r.left-s.left+r.width/2)/s.width*100, yp:(r.top-s.top+r.height/2)/s.height*100 }; }
+function objHide(id){ const el=expNode[id]; el.style.transition='none'; el.style.opacity='0'; el.style.transform='translate(-50%,-50%) scale(.5)'; void el.offsetWidth; el.style.transition=''; }
+function objPlace(id){ const o=EXP_OBJS.find(x=>x.id===id), el=expNode[id]; el.style.transition='none';
+  el.style.left=(o.x*100)+'%'; el.style.top=(o.y*100)+'%'; el.style.opacity='1'; el.style.transform='translate(-50%,-50%) scale(1)'; void el.offsetWidth; el.style.transition=''; }
+function objStartAt(id,xp,yp){ const el=expNode[id]; el.style.transition='none';
+  el.style.left=xp+'%'; el.style.top=yp+'%'; el.style.opacity='1'; el.style.transform='translate(-50%,-50%) scale(.55)'; void el.offsetWidth; el.style.transition=''; }
+function objMove(id){ const o=EXP_OBJS.find(x=>x.id===id), el=expNode[id];
+  el.style.left=(o.x*100)+'%'; el.style.top=(o.y*100)+'%'; el.style.transform='translate(-50%,-50%) scale(1)'; }
+function ptr(xp,yp){ expPointer.style.left=xp+'%'; expPointer.style.top=yp+'%'; }
+function ptrToBtn(id){ const c=pctCenter(expBtn[id]); ptr(c.xp,c.yp-8); }
+function ptrToObj(id){ const o=EXP_OBJS.find(x=>x.id===id); ptr(o.x*100, o.y*100-3); }
+function press(id){ const b=expBtn[id]; b.classList.add('press'); setTimeout(()=>b.classList.remove('press'),260); }
+const after=(tok,ms,fn)=>setTimeout(()=>{ if(tok===expToken) fn(); }, ms);
+
 function expApply(){
-  const s=EXP_STEPS[expStep];
-  EXP_OBJS.forEach(o=>document.getElementById('expo-'+o.id).classList.toggle('show', !!s.objs));
-  const b=document.getElementById('expBubble'); b.textContent=s.bubble; b.classList.toggle('show', !!s.bubble);
-  const bd=document.getElementById('expBadge'); document.getElementById('expChip').textContent=s.badge; bd.classList.toggle('show', !!s.badge);
-  document.getElementById('expCap').textContent=s.cap;
-  document.getElementById('expProg').textContent=(expStep+1)+' / '+EXP_STEPS.length;
+  expToken++; const tok=expToken;
+  expBubble.classList.remove('show'); expPodium.classList.remove('show');
+  document.getElementById('expProg').textContent=(expStep+1)+' / 3';
+  if(expStep===0){
+    document.getElementById('expCap').textContent='① ボタンを押して物を出し、好きな場所へ動かそう ｜ Tap & place';
+    document.getElementById('expTray').classList.add('show');
+    EXP_OBJS.forEach(o=>objHide(o.id));
+    expPointer.classList.remove('show');
+    runStep1(tok);
+  } else {
+    document.getElementById('expTray').classList.remove('show');
+    expPointer.classList.remove('show');
+    EXP_OBJS.forEach(o=>objPlace(o.id));
+    if(expStep===1){
+      document.getElementById('expCap').textContent='② 英語で説明 → 聞いて予想して配置 ｜ Describe & Guess';
+      expBubble.textContent='The ball is on the table.';
+      setTimeout(()=>{ if(tok===expToken) expBubble.classList.add('show'); }, 200);
+    } else {
+      document.getElementById('expCap').textContent='③ こたえあわせ → 1〜3位を発表！ ｜ Check & Ranking';
+      setTimeout(()=>{ if(tok===expToken) expPodium.classList.add('show'); }, 200);
+    }
+  }
 }
-function expNext(){ if(expStep<EXP_STEPS.length-1){ expStep++; expApply(); } }
+function runStep1(tok){
+  ptr(50,62);
+  after(tok,200,()=>{ expPointer.classList.add('show'); });
+  [['ball',250],['clock',1450],['lamp',2650],['book',3850]].forEach(([id,t])=>{
+    after(tok,t,      ()=>{ ptrToBtn(id); });
+    after(tok,t+600,  ()=>{ press(id); const c=pctCenter(expBtn[id]); objStartAt(id,c.xp,c.yp); });
+    after(tok,t+900,  ()=>{ objMove(id); ptrToObj(id); });
+  });
+  after(tok,5000,()=>{ expPointer.classList.remove('show'); });
+  after(tok,5300,()=>{ document.getElementById('expTray').classList.remove('show'); });
+}
+function expNext(){ if(expStep<2){ expStep++; expApply(); } }
 function expPrev(){ if(expStep>0){ expStep--; expApply(); } }
-expBuild(); setTimeout(expApply, 200);
+function expToggleFs(){
+  const w=document.getElementById('explainerWrap');
+  w.classList.toggle('fs');
+  document.getElementById('expFsBtn').textContent = w.classList.contains('fs') ? '✕ とじる' : '⛶ 全画面';
+  setTimeout(expApply, 60); // サイズに合わせて再配置／再生
+}
+expBuild(); setTimeout(expApply, 250);
 
 if(!dbReady){ document.getElementById('phaseTag').textContent='Firebase未設定'; alert('firebase-config.js を設定してください'); }
 const ref = dbReady ? db.ref('sessions/'+CODE) : null;
