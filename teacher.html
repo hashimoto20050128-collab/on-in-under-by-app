@@ -36,7 +36,9 @@
   #explainerWrap.fs{position:fixed;inset:0;z-index:70;max-width:none;background:var(--cream);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:14px;gap:6px}
   .exp-topbar{display:flex;justify-content:flex-end;width:100%;max-width:680px}
   #explainerWrap.fs .exp-stage{max-width:min(96vw, calc((100vh - 230px) * 1.78))}
-  .exp-stage{position:relative;width:100%;max-width:680px;margin:10px auto;aspect-ratio:1918/1077;border-radius:14px;overflow:hidden;box-shadow:var(--shadow)}
+  .exp-stage{position:relative;z-index:0;width:100%;max-width:680px;margin:10px auto;aspect-ratio:1918/1077;border-radius:14px;overflow:hidden;box-shadow:var(--shadow)}
+  .exp-stage.bare{box-shadow:none;background:transparent}
+  .exp-stage.bare>.exp-bg{display:none}
   .exp-bg{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:1}
   .exp-obj{position:absolute;z-index:3;opacity:0;transform:translate(-50%,-50%) scale(.5);
     transition:left .7s cubic-bezier(.2,.8,.2,1), top .7s cubic-bezier(.2,.8,.2,1), transform .7s cubic-bezier(.2,.8,.2,1), opacity .5s ease}
@@ -53,17 +55,17 @@
   .exp-bubble{position:absolute;left:62%;top:16%;transform:translateX(-50%) scale(.8);z-index:5;opacity:0;transition:all .45s ease;
     background:#fff;border:2px solid var(--line);border-radius:16px;padding:8px 16px;font-family:"Baloo 2",sans-serif;font-weight:700;color:var(--ink);white-space:nowrap;box-shadow:var(--shadow)}
   .exp-bubble.show{opacity:1;transform:translateX(-50%) scale(1)}
-  .exp-podium-overlay{position:absolute;inset:0;z-index:7;display:none;flex-direction:column;align-items:center;justify-content:center;gap:8px;background:rgba(251,241,221,.82)}
+  .exp-podium-overlay{position:absolute;inset:0;z-index:7;display:none;flex-direction:column;align-items:center;justify-content:center;gap:8px;background:rgba(45,40,35,.34)}
   .exp-podium-overlay.show{display:flex}
-  /* ②：2画面（説明する人 / 聞いて予想する人）— 枠サイズはステージと同一、部屋を大きく */
-  .exp-duo{position:absolute;inset:0;z-index:8;display:none;background:var(--cream)}
+  /* ②：2画面（説明する人 / 聞いて予想する人）— 枠なし・部屋を大きく */
+  .exp-duo{position:absolute;inset:0;z-index:8;display:none;background:transparent}
   .exp-duo.show{display:block}
-  .dev{position:absolute;top:52%;transform:translateY(-50%);width:47%}
-  .dev.A{left:1.5%} .dev.B{right:1.5%}
-  .dev .lbl{text-align:center;font-weight:800;font-size:.85rem;line-height:1.15;margin-bottom:7px}
-  .dev .lbl span{display:block;font-weight:700;font-size:.68rem;color:var(--ink-soft)}
+  .dev{position:absolute;top:54%;transform:translateY(-50%);width:47.5%}
+  .dev.A{left:1%} .dev.B{right:1%}
+  .dev .lbl{text-align:center;font-weight:800;font-size:.9rem;line-height:1.15;margin-bottom:8px}
+  .dev .lbl span{display:block;font-weight:700;font-size:.72rem;color:var(--ink-soft)}
   .dev.A .lbl{color:var(--peach-d)} .dev.B .lbl{color:var(--sage-d)}
-  .dev .room{position:relative;width:100%;aspect-ratio:1918/1077;border-radius:12px;overflow:hidden;box-shadow:var(--shadow)}
+  .dev .room{position:relative;width:100%;aspect-ratio:1918/1077;border-radius:12px;overflow:hidden;border:1px solid rgba(120,90,60,.18);box-shadow:0 8px 20px rgba(80,55,30,.16)}
   .dev .room>.exp-bg{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:1}
   .dev-obj{position:absolute;z-index:2;transform:translate(-50%,-50%);opacity:0;transition:left .7s cubic-bezier(.2,.8,.2,1),top .7s cubic-bezier(.2,.8,.2,1),opacity .35s ease}
   .dev-obj.show{opacity:1}
@@ -289,7 +291,7 @@ function expBuild(){
     b.innerHTML='<img src="'+o.img+'" alt="">'; tray.appendChild(b); expBtn[id]=b;
   });
   // 表彰台（サンプル）
-  expPodium.innerHTML='<div style="font-weight:800;color:var(--peach-d);font-size:1.2rem">🏆 1〜3位 はっぴょう</div>'
+  expPodium.innerHTML='<div style="display:inline-block;background:#fff;border-radius:999px;padding:7px 20px;font-weight:800;color:var(--peach-d);font-size:1.25rem;box-shadow:0 6px 16px rgba(80,55,30,.22)">🏆 1〜3位 はっぴょう</div>'
     + topThreeHTML([{n:12,score:98},{n:7,score:91},{n:23,score:84}], true);
   // ②の2画面：説明する人(devA=全部置く) / 聞いて予想する人(devB=ボールが机へ)
   const mkDevObj=o=>{ const d=document.createElement('div'); d.className='dev-obj';
@@ -319,6 +321,7 @@ function expApply(){
   expToken++; const tok=expToken;
   expBubble.classList.remove('show'); expPodium.classList.remove('show');
   document.getElementById('expDuo').classList.remove('show');
+  document.getElementById('expStage').classList.toggle('bare', expStep===1);   // ②は枠なし
   document.getElementById('expProg').textContent=(expStep+1)+' / 3';
   if(expStep===0){
     document.getElementById('expCap').textContent='① ボタンを押して物を出し、好きな場所へ動かそう ｜ Tap & place';
@@ -330,6 +333,7 @@ function expApply(){
     document.getElementById('expCap').textContent='② 選ばれた人が自分の部屋を英語で説明 → ほかの人は聞いて、自分の画面でその部屋を予想して配置';
     document.getElementById('expTray').classList.remove('show');
     expPointer.classList.remove('show');
+    EXP_OBJS.forEach(o=>objHide(o.id));   // ①の物が透けて残らないように消す
     document.getElementById('expDuo').classList.add('show');
     runStep2(tok);
   } else {
@@ -337,7 +341,7 @@ function expApply(){
     document.getElementById('expTray').classList.remove('show');
     expPointer.classList.remove('show');
     EXP_OBJS.forEach(o=>objPlace(o.id));
-    setTimeout(()=>{ if(tok===expToken) expPodium.classList.add('show'); }, 200);
+    expPodium.classList.add('show');   // すぐ表示
   }
 }
 function runStep2(tok){
@@ -370,8 +374,8 @@ function runStep1(tok){
   };
   play();
 }
-function expNext(){ if(expStep<2){ expStep++; expApply(); } }
-function expPrev(){ if(expStep>0){ expStep--; expApply(); } }
+function expNext(){ expStep=(expStep+1)%3; expApply(); }
+function expPrev(){ expStep=(expStep+2)%3; expApply(); }
 function expToggleFs(){
   const w=document.getElementById('explainerWrap');
   w.classList.toggle('fs');
